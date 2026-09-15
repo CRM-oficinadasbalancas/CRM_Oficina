@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estoque — CRP</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../assets/img/logo-full.png" type="image/png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin-body">
+
+<header class="admin-header">
+  <div class="admin-brand">CRP</div>
+  <nav class="admin-nav">
+    <a href="pedido.html">Pedido</a>
+    <a href="clientes.html">Clientes</a>
+    <a href="assistencia-tecnica.html">Assistência Técnica</a>
+    <a href="estoque.html" class="active">Estoque</a>
+    <a href="catalogo.html">Catálogo</a>
+    <a href="financeiro.html">Financeiro</a>
+  </nav>
+  <div class="admin-user">
+    <span>Olá, <span data-user-name>—</span></span>
+    <a href="trocar-senha.html" style="color:#cfd9ea; font-size:0.85rem;">Trocar senha</a>
+    <button data-logout>Sair</button>
+  </div>
+</header>
+
+<main class="admin-main">
+  <h1 class="admin-title">Estoque</h1>
+  <p style="color:var(--gray-400); margin-top:-16px; margin-bottom:20px; font-size:0.9rem;">
+    Cadastro de peças. A quantidade é baixada automaticamente quando uma peça é usada em uma Assistência Técnica.
+  </p>
+
+  <div class="admin-card">
+    <h2 id="form-title">Nova peça</h2>
+    <form id="peca-form">
+      <input type="hidden" id="peca-id">
+      <div class="form-grid" style="margin-bottom:8px;">
+        <div class="form-field">
+          <label for="codigo">Código *</label>
+          <input type="text" id="codigo" maxlength="15" placeholder="Alfanumérico, até 15 caracteres" required>
+        </div>
+        <div class="form-field">
+          <label for="quantidade">Quantidade *</label>
+          <input type="text" id="quantidade" maxlength="5" placeholder="Ex: 25 ou 12.5" required>
+          <span class="hint">Até 5 caracteres. Separador decimal: ponto (.)</span>
+        </div>
+        <div class="form-field">
+          <label for="localidade">Localidade</label>
+          <input type="text" id="localidade" maxlength="200" placeholder="Ex: Prateleira A3">
+        </div>
+        <div class="form-field span-full">
+          <label for="tipo_modelo">Tipo/Modelo *</label>
+          <textarea id="tipo_modelo" rows="3" maxlength="1000" required></textarea>
+          <span class="hint"><span id="tipo-modelo-contador">0</span>/1000 caracteres</span>
+        </div>
+      </div>
+      <p id="peca-error" class="error-message" style="display:none;"></p>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" id="peca-save-btn">Cadastrar peça</button>
+        <button type="button" class="btn btn-outline" id="peca-cancel-btn">Limpar / novo</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="admin-card">
+    <h2>Peças em estoque</h2>
+    <div class="form-actions" style="margin-top:0; margin-bottom:16px;">
+      <button type="button" class="btn btn-outline" id="btn-exportar-lista">Exportar lista</button>
+      <button type="button" class="btn btn-outline" id="btn-relatorio">Relatório de estoque</button>
+      <button type="button" class="btn btn-outline" id="btn-baixar-modelo">Baixar modelo de importação</button>
+      <button type="button" class="btn btn-outline" id="btn-abrir-importar">Importar planilha</button>
+    </div>
+    <input type="text" id="peca-search" class="table-search" placeholder="Buscar por código, tipo/modelo, localidade...">
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Tipo/Modelo</th>
+            <th>Quantidade</th>
+            <th>Localidade</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="pecas-tbody">
+          <tr><td colspan="5">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- MODAL IMPORTAR PLANILHA -->
+<div class="modal-overlay" id="modal-importar">
+  <div class="modal-box" style="max-width:600px;">
+    <h3>Importar Peças via Planilha</h3>
+    <p style="font-size:0.85rem; color:var(--gray-700); margin-bottom:14px;">
+      Use o modelo (botão "Baixar modelo de importação"), preencha as linhas e envie o arquivo .xlsx aqui.
+      Colunas esperadas: Código, Tipo/Modelo, Quantidade, Localidade.
+    </p>
+    <div class="form-field" style="margin-bottom:14px;">
+      <label for="importar-arquivo">Arquivo (.xlsx)</label>
+      <input type="file" id="importar-arquivo" accept=".xlsx,.xls">
+    </div>
+    <div id="importar-preview" style="display:none; margin-bottom:14px; max-height:240px; overflow-y:auto; font-size:0.82rem;"></div>
+    <p id="importar-error" class="error-message" style="display:none;"></p>
+    <div class="form-actions">
+      <button type="button" class="btn btn-primary" id="importar-btn-confirmar" disabled>Importar linhas</button>
+      <button type="button" class="btn btn-outline" id="importar-btn-cancelar">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="js/admin-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/planilha.js"></script>
+<script src="js/estoque.js"></script>
+</body>
+</html>

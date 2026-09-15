@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trocar senha — CRP</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../assets/img/logo-full.png" type="image/png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="login-shell">
+  <div class="login-card">
+    <div class="brand-mark">
+      <img class="bm-mark-full" src="../assets/img/logo-full.png" alt="CRP">
+    </div>
+    <h1 id="page-title">Defina sua nova senha</h1>
+    <p style="text-align:center; color:var(--gray-400); font-size:0.85rem; margin-top:-16px; margin-bottom:20px;" id="page-subtitle">
+      Por segurança, você precisa trocar a senha temporária antes de continuar.
+    </p>
+
+    <form id="change-form">
+      <div class="form-field" style="margin-bottom:14px;">
+        <label for="new-password">Nova senha</label>
+        <input type="password" id="new-password" name="new-password" autocomplete="new-password" required minlength="8">
+        <span class="hint">Mínimo de 8 caracteres.</span>
+      </div>
+      <div class="form-field" style="margin-bottom:20px;">
+        <label for="confirm-password">Confirmar nova senha</label>
+        <input type="password" id="confirm-password" name="confirm-password" autocomplete="new-password" required minlength="8">
+      </div>
+      <p id="change-error" class="error-message" style="display:none;"></p>
+      <button type="submit" class="btn btn-primary btn-block" id="change-btn">Salvar nova senha</button>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/admin-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script>
+  (async function () {
+    var auth = await window.ADMIN_AUTH_READY;
+    if (!auth) return; // já foi redirecionado
+
+    if (!auth.profile.must_change_password) {
+      document.getElementById('page-title').textContent = 'Trocar senha';
+      document.getElementById('page-subtitle').textContent = 'Defina uma nova senha para sua conta.';
+    }
+
+    document.getElementById('change-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var newPassword = document.getElementById('new-password').value;
+      var confirmPassword = document.getElementById('confirm-password').value;
+      var errorEl = document.getElementById('change-error');
+      var btn = document.getElementById('change-btn');
+
+      errorEl.style.display = 'none';
+
+      if (newPassword !== confirmPassword) {
+        errorEl.textContent = 'As senhas não coincidem.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+
+      var { error: updateError } = await supabaseClient.auth.updateUser({ password: newPassword });
+      if (updateError) {
+        errorEl.textContent = 'Não foi possível trocar a senha: ' + updateError.message;
+        errorEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Salvar nova senha';
+        return;
+      }
+
+      await supabaseClient
+        .from('profiles')
+        .update({ must_change_password: false })
+        .eq('id', auth.session.user.id);
+
+      location.href = 'pedido.html';
+    });
+  })();
+</script>
+</body>
+</html>
