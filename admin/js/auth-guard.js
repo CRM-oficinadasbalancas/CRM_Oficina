@@ -32,11 +32,34 @@ window.ADMIN_AUTH_READY = (async function () {
     return new Promise(function () {});
   }
 
+  // Admin vê tudo. Técnico e Atendente só acessam as páginas do próprio
+  // perfil — tanto por URL direta quanto pelos links do menu.
+  var PAGINAS_POR_ROLE = {
+    tecnico: ['assistencia-tecnica', 'estoque'],
+    atendente: ['clientes', 'pedido', 'catalogo', 'financeiro']
+  };
+  if (profile.role !== 'admin') {
+    var paginasPermitidas = PAGINAS_POR_ROLE[profile.role] || [];
+    if (CURRENT_PAGE !== 'trocar-senha' && paginasPermitidas.indexOf(CURRENT_PAGE) === -1) {
+      location.replace(paginasPermitidas[0] + '.html');
+      return new Promise(function () {});
+    }
+  }
+
   // Não usar DOMContentLoaded aqui: como este código já passou por vários
   // awaits, o DOM certamente já está pronto — e o evento pode já ter disparado
   // antes de chegarmos aqui, o que faria o listener nunca executar.
   var nameEls = document.querySelectorAll('[data-user-name]');
   nameEls.forEach(function (el) { el.textContent = profile.nome_exibicao; });
+
+  // Esconde do menu os links de páginas fora do perfil de quem logou
+  // (ex: Atendente não vê Estoque nem Usuários no menu).
+  if (profile.role !== 'admin') {
+    document.querySelectorAll('[data-role]').forEach(function (el) {
+      var roles = el.getAttribute('data-role').split(' ');
+      if (roles.indexOf(profile.role) === -1) el.remove();
+    });
+  }
 
   var logoutBtns = document.querySelectorAll('[data-logout]');
   logoutBtns.forEach(function (btn) {
