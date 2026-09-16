@@ -33,17 +33,30 @@ async function loadHistoricoContatos(clienteId, containerId) {
 
   conteudo.innerHTML = data.map(function (h) {
     var dataStr = new Date(h.created_at).toLocaleString('pt-BR');
+    var badgeResultado = '';
+    if (h.resultado === 'positivo') badgeResultado = ' <span class="badge badge-ok">Positivo</span>';
+    else if (h.resultado === 'negativo') badgeResultado = ' <span class="badge badge-danger">Negativo</span>';
     return '<div style="border-bottom:1px solid var(--off-white); padding:10px 0;">' +
-      '<div style="color:var(--gray-400); font-size:0.78rem; margin-bottom:4px;">' + dataStr + '</div>' +
+      '<div style="color:var(--gray-400); font-size:0.78rem; margin-bottom:4px;">' + dataStr + badgeResultado + '</div>' +
       '<div>' + h.anotacao.replace(/</g, '&lt;') + '</div>' +
     '</div>';
   }).join('');
 }
 
-async function salvarHistoricoContato(clienteId, anotacao, autorId) {
+async function salvarHistoricoContato(clienteId, anotacao, autorId, resultado) {
   return supabaseClient.from('cliente_historico').insert({
-    cliente_id: clienteId, anotacao: anotacao, created_by: autorId
+    cliente_id: clienteId, anotacao: anotacao, created_by: autorId, resultado: resultado || null
   });
+}
+
+async function carregarHistoricoBruto(clienteId) {
+  var { data, error } = await supabaseClient
+    .from('cliente_historico')
+    .select('created_at, resultado')
+    .eq('cliente_id', clienteId)
+    .order('created_at', { ascending: true });
+  if (error) return [];
+  return data || [];
 }
 
 /* ===================== HISTÓRICO DE ASSISTÊNCIAS TÉCNICAS (por cliente) ===================== */

@@ -185,6 +185,7 @@
           <tr>
             <th>Nome</th>
             <th>Categoria</th>
+            <th>Prazo</th>
             <th>Contato</th>
             <th>CNPJ/CPF</th>
             <th></th>
@@ -216,6 +217,10 @@
     <h3>Histórico de follow-up — <span id="historico-cliente-nome"></span></h3>
     <div class="form-field" style="margin-bottom:12px;">
       <textarea id="historico-nova-anotacao" rows="2" placeholder="Registrar novo contato/anotação..."></textarea>
+    </div>
+    <div class="form-field" id="historico-resultado-wrapper" style="margin-bottom:12px; display:none;">
+      <label for="historico-resultado">Resultado deste contato</label>
+      <select id="historico-resultado"></select>
     </div>
     <div class="form-actions" style="margin-bottom:16px;">
       <button type="button" class="btn btn-primary" id="historico-btn-adicionar">Adicionar</button>
@@ -262,6 +267,7 @@
 <script src="js/cnpj.js"></script>
 <script src="js/planilha.js"></script>
 <script src="js/historico.js"></script>
+<script src="js/prazos.js"></script>
 <script src="js/clientes.js"></script>
 </body>
 </html>

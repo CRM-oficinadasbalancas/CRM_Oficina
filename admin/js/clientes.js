@@ -37,6 +37,7 @@ function normalizarCnpj(v) {
 }
 
 var cnpjDuplicadoMap = {};
+var historicoPorClienteMap = {};
 
 async function loadClientes() {
   var { data, error } = await supabaseClient
@@ -58,6 +59,20 @@ async function loadClientes() {
     cnpjDuplicadoMap[cnpj] = (cnpjDuplicadoMap[cnpj] || 0) + 1;
   });
 
+  historicoPorClienteMap = {};
+  if (allClientes.length) {
+    var ids = allClientes.map(function (c) { return c.id; });
+    var { data: historico } = await supabaseClient
+      .from('cliente_historico')
+      .select('cliente_id, created_at, resultado')
+      .in('cliente_id', ids)
+      .order('created_at', { ascending: true });
+    (historico || []).forEach(function (h) {
+      if (!historicoPorClienteMap[h.cliente_id]) historicoPorClienteMap[h.cliente_id] = [];
+      historicoPorClienteMap[h.cliente_id].push(h);
+    });
+  }
+
   renderClientesTable(allClientes);
 }
 
@@ -77,7 +92,7 @@ function iniciarEdicaoClientePorId(clienteId) {
 function renderClientesTable(list) {
   var tbody = document.getElementById('clientes-tbody');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="5">Nenhum cliente cadastrado ainda.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6">Nenhum cliente cadastrado ainda.</td></tr>';
     return;
   }
 
@@ -86,9 +101,16 @@ function renderClientesTable(list) {
     var cnpjNormalizado = normalizarCnpj(c.cnpj_cpf);
     var badgeDuplicado = (cnpjNormalizado && cnpjDuplicadoMap[cnpjNormalizado] > 1) ? ' <span class="badge badge-warning">CNPJ/CPF duplicado</span>' : '';
     var categoria = c.categoria ? CATEGORIA_LABELS[c.categoria] : '—';
+    var prazoTexto = '—';
+    if (c.categoria) {
+      var retorno = calcularProximoRetorno(c, historicoPorClienteMap[c.id] || []);
+      var prazo = formatarPrazo(retorno);
+      prazoTexto = prazo.classe ? '<span class="badge ' + prazo.classe + '">' + prazo.texto + '</span>' : prazo.texto;
+    }
     return '<tr>' +
       '<td>' + (c.razao_social || '') + badgeDuplicado + '</td>' +
       '<td>' + categoria + '</td>' +
+      '<td>' + prazoTexto + '</td>' +
       '<td>' + contato + '</td>' +
       '<td>' + (c.cnpj_cpf || '—') + '</td>' +
       '<td class="row-actions">' +
@@ -147,10 +169,26 @@ function renderClientesTable(list) {
 
 var clienteEmHistorico = null;
 
+function configurarSeletorResultado(categoria) {
+  var wrapper = document.getElementById('historico-resultado-wrapper');
+  var select = document.getElementById('historico-resultado');
+  var labels = RESULTADO_LABELS_POR_CATEGORIA[categoria];
+  if (!labels) {
+    wrapper.style.display = 'none';
+    return;
+  }
+  wrapper.style.display = 'block';
+  select.innerHTML =
+    '<option value="">Sem resultado ainda</option>' +
+    '<option value="positivo">' + labels.positivo + '</option>' +
+    '<option value="negativo">' + labels.negativo + '</option>';
+}
+
 function abrirHistoricoFollowup(cliente) {
   clienteEmHistorico = cliente;
   document.getElementById('historico-cliente-nome').textContent = cliente.razao_social;
   document.getElementById('historico-nova-anotacao').value = '';
+  configurarSeletorResultado(cliente.categoria);
   document.getElementById('modal-historico').classList.add('open');
   loadHistoricoContatos(cliente.id, 'historico-conteudo');
 }
@@ -161,9 +199,12 @@ document.getElementById('historico-btn-adicionar').addEventListener('click', asy
   var anotacao = textarea.value.trim();
   if (!anotacao) return;
 
+  var resultadoSelect = document.getElementById('historico-resultado');
+  var resultado = (RESULTADO_LABELS_POR_CATEGORIA[clienteEmHistorico.categoria] && resultadoSelect.value) || null;
+
   var btn = this;
   btn.disabled = true;
-  var { error } = await salvarHistoricoContato(clienteEmHistorico.id, anotacao, currentUserId);
+  var { error } = await salvarHistoricoContato(clienteEmHistorico.id, anotacao, currentUserId, resultado);
   btn.disabled = false;
 
   if (error) {
@@ -172,6 +213,7 @@ document.getElementById('historico-btn-adicionar').addEventListener('click', asy
   }
   textarea.value = '';
   loadHistoricoContatos(clienteEmHistorico.id, 'historico-conteudo');
+  loadClientes();
 });
 
 document.getElementById('cliente-search').addEventListener('input', function (e) {

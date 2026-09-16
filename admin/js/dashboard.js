@@ -6,15 +6,10 @@ var QUADRANTES = [
   { categoria: 'pos_venda', label: 'Pós-venda / Follow-up', pagina: 'pos-venda.html' }
 ];
 
-function diasDesde(dataStr) {
-  var diff = Date.now() - new Date(dataStr).getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
-}
-
 async function carregarQuadrante(quadrante) {
   var { data: clientes, error } = await supabaseClient
     .from('clientes')
-    .select('id, razao_social, telefone_empresa, email_empresa, created_at')
+    .select('id, razao_social, telefone_empresa, email_empresa, created_at, categoria')
     .eq('categoria', quadrante.categoria);
 
   if (error) {
@@ -35,36 +30,41 @@ async function carregarQuadrante(quadrante) {
   var ids = clientes.map(function (c) { return c.id; });
   var { data: historico } = await supabaseClient
     .from('cliente_historico')
-    .select('cliente_id, created_at')
+    .select('cliente_id, created_at, resultado')
     .in('cliente_id', ids)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: true });
 
-  var ultimoContato = {};
+  var historicoPorCliente = {};
   (historico || []).forEach(function (h) {
-    if (!ultimoContato[h.cliente_id]) ultimoContato[h.cliente_id] = h.created_at;
+    if (!historicoPorCliente[h.cliente_id]) historicoPorCliente[h.cliente_id] = [];
+    historicoPorCliente[h.cliente_id].push(h);
   });
 
-  clientes.forEach(function (c) {
-    c._ultimoContato = ultimoContato[c.id] || null;
+  var comPrazo = clientes.map(function (c) {
+    return { cliente: c, retorno: calcularProximoRetorno(c, historicoPorCliente[c.id] || []) };
+  }).filter(function (item) { return !item.retorno.concluido; });
+
+  comPrazo.sort(function (a, b) {
+    if (a.retorno.prioridadeMaxima !== b.retorno.prioridadeMaxima) return a.retorno.prioridadeMaxima ? -1 : 1;
+    if (!a.retorno.data && !b.retorno.data) return 0;
+    if (!a.retorno.data) return 1;
+    if (!b.retorno.data) return -1;
+    return a.retorno.data - b.retorno.data;
   });
 
-  // Sem contato registrado ainda vem primeiro; entre os que já têm contato,
-  // o mais antigo (mais tempo parado) vem primeiro — é quem mais precisa de atenção.
-  clientes.sort(function (a, b) {
-    if (!a._ultimoContato && !b._ultimoContato) return new Date(a.created_at) - new Date(b.created_at);
-    if (!a._ultimoContato) return -1;
-    if (!b._ultimoContato) return 1;
-    return new Date(a._ultimoContato) - new Date(b._ultimoContato);
-  });
+  if (!comPrazo.length) {
+    document.getElementById('quad-lista-' + quadrante.categoria).innerHTML =
+      '<p style="color:var(--gray-400); font-size:0.85rem;">Tudo em dia por aqui.</p>';
+    return;
+  }
 
-  var top5 = clientes.slice(0, 5);
-  document.getElementById('quad-lista-' + quadrante.categoria).innerHTML = top5.map(function (c) {
-    var status = c._ultimoContato
-      ? 'último contato há ' + diasDesde(c._ultimoContato) + ' dia(s)'
-      : 'sem contato registrado';
+  var top5 = comPrazo.slice(0, 5);
+  document.getElementById('quad-lista-' + quadrante.categoria).innerHTML = top5.map(function (item) {
+    var prazo = formatarPrazo(item.retorno);
+    var badge = prazo.classe ? '<span class="badge ' + prazo.classe + '">' + prazo.texto + '</span>' : prazo.texto;
     return '<div style="padding:8px 0; border-bottom:1px solid var(--off-white);">' +
-      '<strong>' + c.razao_social + '</strong><br>' +
-      '<span style="font-size:0.8rem; color:var(--gray-400);">' + status + '</span>' +
+      '<strong>' + item.cliente.razao_social + '</strong><br>' +
+      '<span style="font-size:0.8rem;">' + badge + '</span>' +
     '</div>';
   }).join('');
 }

@@ -63,7 +63,7 @@
     <h2>Clientes em Manutenção</h2>
     <div class="table-scroll">
       <table class="admin-table">
-        <thead><tr><th>Nome</th><th>Contato</th><th>Categoria</th><th></th></tr></thead>
+        <thead><tr><th>Nome</th><th>Contato</th><th>Prazo</th><th>Categoria</th><th></th></tr></thead>
         <tbody id="pipeline-tbody"><tr><td colspan="4">Carregando...</td></tr></tbody>
       </table>
     </div>
@@ -76,6 +76,10 @@
     <h3>Histórico de follow-up — <span id="historico-cliente-nome"></span></h3>
     <div class="form-field" style="margin-bottom:12px;">
       <textarea id="historico-nova-anotacao" rows="2" placeholder="Registrar novo contato/anotação..."></textarea>
+    </div>
+    <div class="form-field" id="historico-resultado-wrapper" style="margin-bottom:12px; display:none;">
+      <label for="historico-resultado">Resultado deste contato</label>
+      <select id="historico-resultado"></select>
     </div>
     <div class="form-actions" style="margin-bottom:16px;">
       <button type="button" class="btn btn-primary" id="historico-btn-adicionar">Adicionar</button>
@@ -95,6 +99,7 @@
 <script src="js/auth-guard.js"></script>
 <script src="js/toast.js"></script>
 <script src="js/historico.js"></script>
+<script src="js/prazos.js"></script>
 <script>
   var PIPELINE_CATEGORIA = 'manutencao';
   var PIPELINE_LABEL = 'Manutenção';

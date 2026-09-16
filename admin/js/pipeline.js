@@ -7,6 +7,7 @@ var CATEGORIA_LABELS_PIPELINE = { venda: 'Venda', manutencao: 'Manutenção', po
 
 var currentUserId = null;
 var pipelineClientes = [];
+var pipelineHistoricoPorCliente = {};
 var clienteEmHistorico = null;
 
 async function loadPipeline() {
@@ -22,13 +23,29 @@ async function loadPipeline() {
   }
 
   pipelineClientes = data || [];
+  pipelineHistoricoPorCliente = {};
+
+  if (pipelineClientes.length) {
+    var ids = pipelineClientes.map(function (c) { return c.id; });
+    var { data: historico } = await supabaseClient
+      .from('cliente_historico')
+      .select('cliente_id, created_at, resultado')
+      .in('cliente_id', ids)
+      .order('created_at', { ascending: true });
+
+    (historico || []).forEach(function (h) {
+      if (!pipelineHistoricoPorCliente[h.cliente_id]) pipelineHistoricoPorCliente[h.cliente_id] = [];
+      pipelineHistoricoPorCliente[h.cliente_id].push(h);
+    });
+  }
+
   renderPipelineTable();
 }
 
 function renderPipelineTable() {
   var tbody = document.getElementById('pipeline-tbody');
   if (!pipelineClientes.length) {
-    tbody.innerHTML = '<tr><td colspan="4">Nenhum cliente em ' + PIPELINE_LABEL + ' ainda.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5">Nenhum cliente em ' + PIPELINE_LABEL + ' ainda.</td></tr>';
     return;
   }
 
@@ -36,11 +53,30 @@ function renderPipelineTable() {
     return '<option value="' + cat + '">' + CATEGORIA_LABELS_PIPELINE[cat] + '</option>';
   }).join('');
 
-  tbody.innerHTML = pipelineClientes.map(function (c) {
+  var comPrazo = pipelineClientes.map(function (c) {
+    var retorno = calcularProximoRetorno(c, pipelineHistoricoPorCliente[c.id] || []);
+    return { cliente: c, retorno: retorno };
+  });
+
+  // Ordena por urgência: prioridade máxima e atrasados primeiro, depois por data mais próxima.
+  comPrazo.sort(function (a, b) {
+    if (a.retorno.concluido !== b.retorno.concluido) return a.retorno.concluido ? 1 : -1;
+    if (a.retorno.prioridadeMaxima !== b.retorno.prioridadeMaxima) return a.retorno.prioridadeMaxima ? -1 : 1;
+    if (!a.retorno.data && !b.retorno.data) return 0;
+    if (!a.retorno.data) return 1;
+    if (!b.retorno.data) return -1;
+    return a.retorno.data - b.retorno.data;
+  });
+
+  tbody.innerHTML = comPrazo.map(function (item) {
+    var c = item.cliente;
     var contato = [c.telefone_empresa, c.email_empresa].filter(Boolean).join(' — ') || '—';
+    var prazo = formatarPrazo(item.retorno);
+    var badgePrazo = prazo.classe ? '<span class="badge ' + prazo.classe + '">' + prazo.texto + '</span>' : prazo.texto;
     return '<tr>' +
       '<td>' + (c.razao_social || '') + '</td>' +
       '<td>' + contato + '</td>' +
+      '<td>' + badgePrazo + '</td>' +
       '<td><select data-mover="' + c.id + '">' + opcoesCategoria.replace(
         'value="' + PIPELINE_CATEGORIA + '"', 'value="' + PIPELINE_CATEGORIA + '" selected'
       ) + '</select></td>' +
@@ -87,10 +123,26 @@ function renderPipelineTable() {
   });
 }
 
+function configurarSeletorResultado() {
+  var wrapper = document.getElementById('historico-resultado-wrapper');
+  var select = document.getElementById('historico-resultado');
+  var labels = RESULTADO_LABELS_POR_CATEGORIA[PIPELINE_CATEGORIA];
+  if (!labels) {
+    wrapper.style.display = 'none';
+    return;
+  }
+  wrapper.style.display = 'block';
+  select.innerHTML =
+    '<option value="">Sem resultado ainda</option>' +
+    '<option value="positivo">' + labels.positivo + '</option>' +
+    '<option value="negativo">' + labels.negativo + '</option>';
+}
+
 function abrirHistoricoFollowup(cliente) {
   clienteEmHistorico = cliente;
   document.getElementById('historico-cliente-nome').textContent = cliente.razao_social;
   document.getElementById('historico-nova-anotacao').value = '';
+  configurarSeletorResultado();
   document.getElementById('modal-historico').classList.add('open');
   loadHistoricoContatos(cliente.id, 'historico-conteudo');
 }
@@ -101,9 +153,12 @@ document.getElementById('historico-btn-adicionar').addEventListener('click', asy
   var anotacao = textarea.value.trim();
   if (!anotacao) return;
 
+  var resultadoSelect = document.getElementById('historico-resultado');
+  var resultado = (RESULTADO_LABELS_POR_CATEGORIA[PIPELINE_CATEGORIA] && resultadoSelect.value) || null;
+
   var btn = this;
   btn.disabled = true;
-  var { error } = await salvarHistoricoContato(clienteEmHistorico.id, anotacao, currentUserId);
+  var { error } = await salvarHistoricoContato(clienteEmHistorico.id, anotacao, currentUserId, resultado);
   btn.disabled = false;
 
   if (error) {
@@ -112,6 +167,7 @@ document.getElementById('historico-btn-adicionar').addEventListener('click', asy
   }
   textarea.value = '';
   loadHistoricoContatos(clienteEmHistorico.id, 'historico-conteudo');
+  loadPipeline();
 });
 
 document.getElementById('historico-btn-fechar').addEventListener('click', function () {
