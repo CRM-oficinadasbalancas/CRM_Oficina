@@ -16,7 +16,11 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const GERENTE_EMAIL = 'lucasbalancas@hotmail.com';
+// TEMPORÁRIO: o Resend só permite enviar pra e-mails fora da própria conta
+// depois de verificar um domínio (resend.com/domains). Até lá, os alertas
+// caem na própria caixa da conta Resend. Trocar pra 'lucasbalancas@hotmail.com'
+// assim que o domínio da Oficina estiver verificado no Resend.
+const GERENTE_EMAIL = 'crm.oficinadasbalancas@gmail.com';
 const REMETENTE = 'CRM Oficina das Balanças <onboarding@resend.dev>';
 
 const HORAS_VENDAS = [24, 72, 120];
