@@ -102,8 +102,11 @@ function formatarPrazo(retorno) {
   return { texto: 'Em ' + diffDias + ' dia(s)', classe: '' };
 }
 
-// Rótulos do seletor de resultado, adaptados por categoria.
+// Rótulos do seletor de resultado, adaptados por categoria. Em Vendas o
+// resultado não muda o cálculo do prazo (cadência fixa 24h/72h/120h), mas
+// ainda é registrado — alimenta o alerta de "3 negativas seguidas".
 var RESULTADO_LABELS_POR_CATEGORIA = {
+  venda: { positivo: 'Positivo', negativo: 'Negativo (sem retorno / não quer contato)' },
   manutencao: { positivo: 'Fechou o serviço', negativo: 'Não fechou' },
   pos_venda: { positivo: 'Retorno positivo', negativo: 'Retorno negativo' }
 };
