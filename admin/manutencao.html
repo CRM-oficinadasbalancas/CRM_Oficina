@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manutenção — CRP</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../assets/img/logo-full.png" type="image/png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin-body">
+
+<header class="admin-header">
+  <div class="admin-brand">CRP</div>
+  <nav class="admin-nav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="clientes.html" data-role="atendente">Clientes</a>
+    <a href="vendas.html" data-role="atendente">Vendas</a>
+    <a href="pos-venda.html" data-role="atendente">Pós-venda</a>
+    <a href="assistencia-tecnica.html" data-role="tecnico">Assistência Técnica</a>
+    <a href="estoque.html" data-role="tecnico">Estoque</a>
+    <a href="manutencao.html" class="active" data-role="tecnico">Manutenção</a>
+    <a href="usuarios.html" data-role="admin">Usuários</a>
+  </nav>
+  <div class="admin-user">
+    <span>Olá, <span data-user-name>—</span></span>
+    <a href="trocar-senha.html" style="color:#cfd9ea; font-size:0.85rem;">Trocar senha</a>
+    <button data-logout>Sair</button>
+  </div>
+</header>
+
+<main class="admin-main">
+  <h1 class="admin-title">Manutenção</h1>
+
+  <div class="admin-card">
+    <h2>Novo contato</h2>
+    <form id="pipeline-form">
+      <div class="form-grid" style="margin-bottom:8px;">
+        <div class="form-field">
+          <label for="pipeline-nome">Nome *</label>
+          <input type="text" id="pipeline-nome" required>
+        </div>
+        <div class="form-field">
+          <label for="pipeline-telefone">Telefone</label>
+          <input type="text" id="pipeline-telefone">
+        </div>
+        <div class="form-field">
+          <label for="pipeline-email">E-mail</label>
+          <input type="email" id="pipeline-email">
+        </div>
+      </div>
+      <p style="font-size:0.82rem; color:var(--gray-400); margin:0 0 12px;">Preencha pelo menos o telefone ou o e-mail.</p>
+      <p id="pipeline-error" class="error-message" style="display:none;"></p>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" id="pipeline-save-btn">Adicionar</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="admin-card">
+    <h2>Clientes em Manutenção</h2>
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead><tr><th>Nome</th><th>Contato</th><th>Categoria</th><th></th></tr></thead>
+        <tbody id="pipeline-tbody"><tr><td colspan="4">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- MODAL HISTÓRICO DE FOLLOW-UP -->
+<div class="modal-overlay" id="modal-historico">
+  <div class="modal-box" style="max-width:720px;">
+    <h3>Histórico de follow-up — <span id="historico-cliente-nome"></span></h3>
+    <div class="form-field" style="margin-bottom:12px;">
+      <textarea id="historico-nova-anotacao" rows="2" placeholder="Registrar novo contato/anotação..."></textarea>
+    </div>
+    <div class="form-actions" style="margin-bottom:16px;">
+      <button type="button" class="btn btn-primary" id="historico-btn-adicionar">Adicionar</button>
+    </div>
+    <div id="historico-conteudo">Carregando...</div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-outline" id="historico-btn-fechar">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/admin-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/historico.js"></script>
+<script>
+  var PIPELINE_CATEGORIA = 'manutencao';
+  var PIPELINE_LABEL = 'Manutenção';
+</script>
+<script src="js/pipeline.js"></script>
+</body>
+</html>

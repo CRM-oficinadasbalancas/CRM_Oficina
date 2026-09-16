@@ -1,8 +1,10 @@
 var currentUserId = null;
 var allClientes = [];
 
+var CATEGORIA_LABELS = { venda: 'Venda', manutencao: 'Manutenção', pos_venda: 'Pós-venda' };
+
 var fieldIds = [
-  'codigo', 'cnpj_cpf', 'razao_social', 'nome_fantasia', 'ie',
+  'codigo', 'cnpj_cpf', 'razao_social', 'nome_fantasia', 'ie', 'categoria',
   'logradouro', 'numero', 'complemento', 'bairro', 'cep', 'municipio', 'uf',
   'telefone_empresa', 'email_empresa', 'contato_nome', 'contato_telefone', 'contato_email',
   'forma_pagamento_padrao', 'local_entrega_preferencial', 'observacoes'
@@ -27,14 +29,13 @@ function resetForm() {
   document.getElementById('cliente-id').value = '';
   document.getElementById('form-title').textContent = 'Novo cliente';
   document.getElementById('cliente-error').style.display = 'none';
-  document.getElementById('cnpj-status').textContent = '';
+  document.getElementById('cnpj-status').textContent = 'Opcional.';
 }
 
 function normalizarCnpj(v) {
   return (v || '').replace(/\D/g, '');
 }
 
-var clientesComOrcamentoPendente = {};
 var cnpjDuplicadoMap = {};
 
 async function loadClientes() {
@@ -49,17 +50,6 @@ async function loadClientes() {
   }
 
   allClientes = data || [];
-
-  var { data: pendentes } = await supabaseClient
-    .from('pedidos')
-    .select('cliente_id')
-    .eq('tipo', 'orcamento')
-    .eq('status_orcamento', 'pendente');
-
-  clientesComOrcamentoPendente = {};
-  (pendentes || []).forEach(function (p) {
-    clientesComOrcamentoPendente[p.cliente_id] = (clientesComOrcamentoPendente[p.cliente_id] || 0) + 1;
-  });
 
   cnpjDuplicadoMap = {};
   allClientes.forEach(function (c) {
@@ -92,16 +82,15 @@ function renderClientesTable(list) {
   }
 
   tbody.innerHTML = list.map(function (c) {
-    var contato = [c.contato_nome, c.contato_telefone].filter(Boolean).join(' — ') || '—';
-    var pendentes = clientesComOrcamentoPendente[c.id];
-    var badgePendente = pendentes ? ' <span class="badge badge-warning">' + pendentes + ' orçamento' + (pendentes > 1 ? 's' : '') + ' pendente' + (pendentes > 1 ? 's' : '') + '</span>' : '';
+    var contato = [c.telefone_empresa, c.email_empresa].filter(Boolean).join(' — ') || '—';
     var cnpjNormalizado = normalizarCnpj(c.cnpj_cpf);
     var badgeDuplicado = (cnpjNormalizado && cnpjDuplicadoMap[cnpjNormalizado] > 1) ? ' <span class="badge badge-warning">CNPJ/CPF duplicado</span>' : '';
+    var categoria = c.categoria ? CATEGORIA_LABELS[c.categoria] : '—';
     return '<tr>' +
-      '<td>' + (c.razao_social || '') + badgePendente + badgeDuplicado + '</td>' +
-      '<td>' + (c.nome_fantasia || '—') + '</td>' +
-      '<td>' + (c.cnpj_cpf || '—') + '</td>' +
+      '<td>' + (c.razao_social || '') + badgeDuplicado + '</td>' +
+      '<td>' + categoria + '</td>' +
       '<td>' + contato + '</td>' +
+      '<td>' + (c.cnpj_cpf || '—') + '</td>' +
       '<td class="row-actions">' +
         '<button data-historico="' + c.id + '">Histórico</button>' +
         '<button data-historico-assistencia="' + c.id + '">Assist. Técnica</button>' +
@@ -115,9 +104,7 @@ function renderClientesTable(list) {
     btn.addEventListener('click', function () {
       var cliente = allClientes.find(function (c) { return c.id === btn.dataset.historico; });
       if (!cliente) return;
-      document.getElementById('historico-cliente-nome').textContent = cliente.razao_social;
-      document.getElementById('modal-historico').classList.add('open');
-      loadHistoricoCliente(cliente.id, 'historico-conteudo');
+      abrirHistoricoFollowup(cliente);
     });
   });
 
@@ -144,15 +131,10 @@ function renderClientesTable(list) {
 
   tbody.querySelectorAll('[data-delete]').forEach(function (btn) {
     btn.addEventListener('click', async function () {
-      if (!confirm('Excluir este cliente? Essa ação não pode ser desfeita.')) return;
-      var cliente = allClientes.find(function (c) { return c.id === btn.dataset.delete; });
+      if (!confirm('Excluir este cliente? Essa ação não pode ser desfeita (também remove equipamentos e assistências técnicas vinculadas).')) return;
       var { error } = await supabaseClient.from('clientes').delete().eq('id', btn.dataset.delete);
       if (error) {
-        if (error.code === '23503') {
-          abrirModalMerge(cliente);
-        } else {
-          showToast('Erro ao excluir: ' + error.message, 'error');
-        }
+        showToast('Erro ao excluir: ' + error.message, 'error');
         return;
       }
       showToast('Cliente excluído.', 'ok');
@@ -161,110 +143,35 @@ function renderClientesTable(list) {
   });
 }
 
-/* ===================== TRANSFERIR HISTÓRICO E EXCLUIR (duplicados) ===================== */
+/* ===================== HISTÓRICO DE FOLLOW-UP ===================== */
 
-var clienteParaExcluir = null;
+var clienteEmHistorico = null;
 
-function abrirModalMerge(cliente) {
-  var modalEl = document.getElementById('modal-merge-cliente');
-  if (!modalEl) {
-    // HTML desatualizado no cache do navegador (sem o modal novo) — evita travar o resto da tela.
-    showToast('Não é possível excluir: este cliente possui pedidos/orçamentos vinculados. Atualize a página (F5) e tente novamente.', 'warning');
-    return;
-  }
-
-  clienteParaExcluir = cliente;
-  document.getElementById('merge-cliente-nome').textContent = cliente.razao_social || cliente.nome_fantasia || '';
-  document.getElementById('merge-cliente-error').style.display = 'none';
-
-  var destinoSelect = document.getElementById('merge-cliente-destino');
-  destinoSelect.innerHTML = allClientes
-    .filter(function (c) { return c.id !== cliente.id; })
-    .map(function (c) {
-      return '<option value="' + c.id + '">' + (c.razao_social || c.nome_fantasia || '') + (c.cnpj_cpf ? ' — ' + c.cnpj_cpf : '') + '</option>';
-    }).join('');
-
-  modalEl.classList.add('open');
+function abrirHistoricoFollowup(cliente) {
+  clienteEmHistorico = cliente;
+  document.getElementById('historico-cliente-nome').textContent = cliente.razao_social;
+  document.getElementById('historico-nova-anotacao').value = '';
+  document.getElementById('modal-historico').classList.add('open');
+  loadHistoricoContatos(cliente.id, 'historico-conteudo');
 }
 
-var mergeCancelarBtn = document.getElementById('merge-cliente-cancelar');
-if (mergeCancelarBtn) mergeCancelarBtn.addEventListener('click', function () {
-  document.getElementById('modal-merge-cliente').classList.remove('open');
-  clienteParaExcluir = null;
-});
-
-var mergeConfirmarBtn = document.getElementById('merge-cliente-confirmar');
-if (mergeConfirmarBtn) mergeConfirmarBtn.addEventListener('click', async function () {
-  var errorEl = document.getElementById('merge-cliente-error');
-  errorEl.style.display = 'none';
-  var destinoId = document.getElementById('merge-cliente-destino').value;
-
-  if (!clienteParaExcluir || !destinoId) return;
+document.getElementById('historico-btn-adicionar').addEventListener('click', async function () {
+  if (!clienteEmHistorico) return;
+  var textarea = document.getElementById('historico-nova-anotacao');
+  var anotacao = textarea.value.trim();
+  if (!anotacao) return;
 
   var btn = this;
   btn.disabled = true;
-  btn.textContent = 'Transferindo...';
-
-  var updatePedidos = await supabaseClient.from('pedidos').update({ cliente_id: destinoId }).eq('cliente_id', clienteParaExcluir.id);
-  if (updatePedidos.error) {
-    errorEl.textContent = 'Erro ao transferir histórico: ' + updatePedidos.error.message;
-    errorEl.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Transferir e excluir';
-    return;
-  }
-
-  var deleteResult = await supabaseClient.from('clientes').delete().eq('id', clienteParaExcluir.id);
+  var { error } = await salvarHistoricoContato(clienteEmHistorico.id, anotacao, currentUserId);
   btn.disabled = false;
-  btn.textContent = 'Transferir e excluir';
 
-  if (deleteResult.error) {
-    errorEl.textContent = 'Histórico transferido, mas houve erro ao excluir o cadastro: ' + deleteResult.error.message;
-    errorEl.style.display = 'block';
+  if (error) {
+    showToast('Erro ao salvar anotação: ' + error.message, 'error');
     return;
   }
-
-  showToast('Histórico transferido e cadastro duplicado excluído.', 'ok');
-  document.getElementById('modal-merge-cliente').classList.remove('open');
-  clienteParaExcluir = null;
-  loadClientes();
-});
-
-var mergeSoExcluirBtn = document.getElementById('merge-cliente-so-excluir');
-if (mergeSoExcluirBtn) mergeSoExcluirBtn.addEventListener('click', async function () {
-  var errorEl = document.getElementById('merge-cliente-error');
-  errorEl.style.display = 'none';
-
-  if (!clienteParaExcluir) return;
-  if (!confirm('Isso vai excluir também todos os pedidos/orçamentos vinculados a "' + (clienteParaExcluir.razao_social || '') + '". Essa ação não pode ser desfeita. Continuar?')) return;
-
-  var btn = this;
-  btn.disabled = true;
-  btn.textContent = 'Excluindo...';
-
-  var deletePedidos = await supabaseClient.from('pedidos').delete().eq('cliente_id', clienteParaExcluir.id);
-  if (deletePedidos.error) {
-    errorEl.textContent = 'Erro ao excluir pedidos vinculados: ' + deletePedidos.error.message;
-    errorEl.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Excluir mesmo assim (perde o histórico)';
-    return;
-  }
-
-  var deleteResult = await supabaseClient.from('clientes').delete().eq('id', clienteParaExcluir.id);
-  btn.disabled = false;
-  btn.textContent = 'Excluir mesmo assim (perde o histórico)';
-
-  if (deleteResult.error) {
-    errorEl.textContent = 'Pedidos excluídos, mas houve erro ao excluir o cadastro: ' + deleteResult.error.message;
-    errorEl.style.display = 'block';
-    return;
-  }
-
-  showToast('Cliente e histórico vinculado excluídos.', 'ok');
-  document.getElementById('modal-merge-cliente').classList.remove('open');
-  clienteParaExcluir = null;
-  loadClientes();
+  textarea.value = '';
+  loadHistoricoContatos(clienteEmHistorico.id, 'historico-conteudo');
 });
 
 document.getElementById('cliente-search').addEventListener('input', function (e) {
@@ -301,7 +208,7 @@ document.getElementById('btn-buscar-cnpj').addEventListener('click', async funct
     document.getElementById('email_empresa').value = dados.email;
     statusEl.textContent = 'Dados encontrados na Receita Federal.';
   } catch (err) {
-    statusEl.textContent = '';
+    statusEl.textContent = 'Opcional.';
     showToast(err.message, 'warning');
   } finally {
     btn.disabled = false;
@@ -316,7 +223,15 @@ document.getElementById('cliente-form').addEventListener('submit', async functio
 
   var razaoSocial = document.getElementById('razao_social').value.trim();
   if (!razaoSocial) {
-    errorEl.textContent = 'Razão Social é obrigatória.';
+    errorEl.textContent = 'Nome é obrigatório.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  var telefone = document.getElementById('telefone_empresa').value.trim();
+  var email = document.getElementById('email_empresa').value.trim();
+  if (!telefone && !email) {
+    errorEl.textContent = 'Preencha pelo menos o telefone ou o e-mail.';
     errorEl.style.display = 'block';
     return;
   }
@@ -376,9 +291,6 @@ document.getElementById('cliente-cancel-btn').addEventListener('click', resetFor
   }
 })();
 
-/* ===================== HISTÓRICO DE COMPRAS ===================== */
-/* loadHistoricoCliente() vem de js/historico.js (compartilhado com pedido.html) */
-
 var historicoBtnFechar = document.getElementById('historico-btn-fechar');
 if (historicoBtnFechar) historicoBtnFechar.addEventListener('click', function () {
   document.getElementById('modal-historico').classList.remove('open');
@@ -411,7 +323,7 @@ function imprimirHistorico(titulo, nomeCliente, conteudoId) {
 var historicoBtnImprimir = document.getElementById('historico-btn-imprimir');
 if (historicoBtnImprimir) historicoBtnImprimir.addEventListener('click', function () {
   var nomeCliente = document.getElementById('historico-cliente-nome').textContent;
-  imprimirHistorico('Histórico de Compras', nomeCliente, 'historico-conteudo');
+  imprimirHistorico('Histórico de Follow-up', nomeCliente, 'historico-conteudo');
 });
 
 var historicoAssistenciaBtnImprimir = document.getElementById('historico-assistencia-btn-imprimir');
@@ -425,8 +337,9 @@ if (historicoAssistenciaBtnImprimir) historicoAssistenciaBtnImprimir.addEventLis
 var COLUNAS_CLIENTE = [
   { titulo: 'Código', chave: 'codigo' },
   { titulo: 'CNPJ/CPF', chave: 'cnpj_cpf' },
-  { titulo: 'Razão Social', chave: 'razao_social' },
+  { titulo: 'Nome', chave: 'razao_social' },
   { titulo: 'Nome Fantasia', chave: 'nome_fantasia' },
+  { titulo: 'Categoria (venda/manutencao/pos_venda)', chave: 'categoria' },
   { titulo: 'Inscrição Estadual', chave: 'ie' },
   { titulo: 'Logradouro', chave: 'logradouro' },
   { titulo: 'Número', chave: 'numero' },
@@ -435,8 +348,8 @@ var COLUNAS_CLIENTE = [
   { titulo: 'CEP', chave: 'cep' },
   { titulo: 'Município', chave: 'municipio' },
   { titulo: 'UF', chave: 'uf' },
-  { titulo: 'Telefone Empresa', chave: 'telefone_empresa' },
-  { titulo: 'E-mail Empresa', chave: 'email_empresa' },
+  { titulo: 'Telefone', chave: 'telefone_empresa' },
+  { titulo: 'E-mail', chave: 'email_empresa' },
   { titulo: 'Nome do Contato', chave: 'contato_nome' },
   { titulo: 'Telefone do Contato', chave: 'contato_telefone' },
   { titulo: 'E-mail do Contato', chave: 'contato_email' },
@@ -446,17 +359,18 @@ var COLUNAS_CLIENTE = [
 ];
 
 var FORMAS_PAGAMENTO_VALIDAS = ['boleto', 'a_vista', 'cartao_credito', 'cartao_debito', 'pix', 'link_pagamento'];
+var CATEGORIAS_VALIDAS = ['venda', 'manutencao', 'pos_venda'];
 var linhasImportacaoClienteValidas = [];
 
 var btnBaixarModeloCliente = document.getElementById('btn-baixar-modelo-cliente');
 if (btnBaixarModeloCliente) btnBaixarModeloCliente.addEventListener('click', function () {
   baixarModeloExcel('modelo-importacao-clientes.xlsx', COLUNAS_CLIENTE, [{
-    codigo: 'C001', cnpj_cpf: '00.000.000/0001-00', razao_social: 'Empresa Exemplo LTDA',
-    nome_fantasia: 'Exemplo', ie: '', logradouro: 'Rua Exemplo', numero: '123', complemento: '',
+    codigo: 'C001', cnpj_cpf: '', razao_social: 'Nome do Cliente Exemplo',
+    nome_fantasia: '', categoria: 'venda', ie: '', logradouro: 'Rua Exemplo', numero: '123', complemento: '',
     bairro: 'Centro', cep: '00000-000', municipio: 'Americana', uf: 'SP',
-    telefone_empresa: '(19) 0000-0000', email_empresa: 'contato@exemplo.com',
-    contato_nome: 'Fulano', contato_telefone: '(19) 90000-0000', contato_email: 'fulano@exemplo.com',
-    forma_pagamento_padrao: 'boleto', local_entrega_preferencial: '', observacoes: ''
+    telefone_empresa: '(19) 90000-0000', email_empresa: 'contato@exemplo.com',
+    contato_nome: '', contato_telefone: '', contato_email: '',
+    forma_pagamento_padrao: '', local_entrega_preferencial: '', observacoes: ''
   }]);
 });
 
@@ -512,9 +426,13 @@ if (importarClienteArquivo) importarClienteArquivo.addEventListener('change', as
 
   var linhasProcessadas = linhas.map(function (linha) {
     var erros = [];
-    if (!linha.razao_social) erros.push('razão social obrigatória');
+    if (!linha.razao_social) erros.push('nome obrigatório');
+    if (!linha.telefone_empresa && !linha.email_empresa) erros.push('telefone ou e-mail obrigatório');
     if (linha.forma_pagamento_padrao && FORMAS_PAGAMENTO_VALIDAS.indexOf(linha.forma_pagamento_padrao) === -1) {
       linha.forma_pagamento_padrao = ''; // valor não reconhecido: importa sem essa particularidade em vez de travar a linha
+    }
+    if (linha.categoria && CATEGORIAS_VALIDAS.indexOf(linha.categoria) === -1) {
+      linha.categoria = ''; // idem
     }
     return Object.assign({}, linha, { erros: erros });
   });
@@ -522,7 +440,7 @@ if (importarClienteArquivo) importarClienteArquivo.addEventListener('change', as
   linhasImportacaoClienteValidas = linhasProcessadas.filter(function (l) { return !l.erros.length; });
 
   previewEl.style.display = 'block';
-  previewEl.innerHTML = '<table class="admin-table"><thead><tr><th>Razão Social</th><th>CNPJ/CPF</th><th>Status</th></tr></thead><tbody>' +
+  previewEl.innerHTML = '<table class="admin-table"><thead><tr><th>Nome</th><th>CNPJ/CPF</th><th>Status</th></tr></thead><tbody>' +
     linhasProcessadas.map(function (l) {
       var cnpjNormalizado = normalizarCnpj(l.cnpj_cpf);
       var existente = cnpjNormalizado && allClientes.find(function (c) { return normalizarCnpj(c.cnpj_cpf) === cnpjNormalizado; });

@@ -15,12 +15,13 @@
 <header class="admin-header no-print">
   <div class="admin-brand">CRP</div>
   <nav class="admin-nav">
-    <a href="pedido.html" data-role="atendente">Pedido</a>
+    <a href="dashboard.html">Dashboard</a>
     <a href="clientes.html" class="active" data-role="atendente">Clientes</a>
+    <a href="vendas.html" data-role="atendente">Vendas</a>
+    <a href="pos-venda.html" data-role="atendente">Pós-venda</a>
     <a href="assistencia-tecnica.html" data-role="tecnico">Assistência Técnica</a>
     <a href="estoque.html" data-role="tecnico">Estoque</a>
-    <a href="catalogo.html" data-role="atendente">Catálogo</a>
-    <a href="financeiro.html" data-role="atendente">Financeiro</a>
+    <a href="manutencao.html" data-role="tecnico">Manutenção</a>
     <a href="usuarios.html" data-role="admin">Usuários</a>
   </nav>
   <div class="admin-user">
@@ -39,25 +40,46 @@
       <input type="hidden" id="cliente-id">
 
       <div class="form-grid" style="margin-bottom:20px;">
+        <div class="form-field span-2">
+          <label for="razao_social">Nome *</label>
+          <input type="text" id="razao_social" required>
+        </div>
+        <div class="form-field">
+          <label for="categoria">Categoria (funil)</label>
+          <select id="categoria">
+            <option value="">— Sem categoria —</option>
+            <option value="venda">Venda</option>
+            <option value="manutencao">Manutenção</option>
+            <option value="pos_venda">Pós-venda</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid" style="margin-bottom:20px;">
+        <div class="form-field">
+          <label for="telefone_empresa">Telefone</label>
+          <input type="text" id="telefone_empresa">
+        </div>
+        <div class="form-field">
+          <label for="email_empresa">E-mail</label>
+          <input type="email" id="email_empresa">
+        </div>
         <div class="form-field">
           <label for="codigo">Código interno</label>
           <input type="text" id="codigo">
           <span class="hint">Opcional.</span>
         </div>
+      </div>
+      <p style="font-size:0.82rem; color:var(--gray-400); margin:-12px 0 20px;">Preencha pelo menos o telefone ou o e-mail.</p>
+
+      <div class="form-grid" style="margin-bottom:20px;">
         <div class="form-field span-2">
           <label for="cnpj_cpf">CNPJ / CPF</label>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <input type="text" id="cnpj_cpf" placeholder="00.000.000/0000-00" style="flex:1; min-width:0;">
             <button type="button" id="btn-buscar-cnpj" class="btn btn-outline" style="white-space:nowrap;">Buscar CNPJ</button>
           </div>
-          <span class="hint" id="cnpj-status"></span>
-        </div>
-      </div>
-
-      <div class="form-grid" style="margin-bottom:20px;">
-        <div class="form-field span-2">
-          <label for="razao_social">Razão Social *</label>
-          <input type="text" id="razao_social" required>
+          <span class="hint" id="cnpj-status">Opcional.</span>
         </div>
         <div class="form-field">
           <label for="nome_fantasia">Nome Fantasia</label>
@@ -69,7 +91,7 @@
         </div>
       </div>
 
-      <h2 style="margin-top:8px;">Endereço</h2>
+      <h2 style="margin-top:8px;">Endereço (opcional)</h2>
       <div class="form-grid" style="margin-bottom:20px;">
         <div class="form-field span-2">
           <label for="logradouro">Logradouro</label>
@@ -98,14 +120,6 @@
         <div class="form-field">
           <label for="uf">UF</label>
           <input type="text" id="uf" maxlength="2" style="text-transform:uppercase;">
-        </div>
-        <div class="form-field">
-          <label for="telefone_empresa">Telefone (empresa)</label>
-          <input type="text" id="telefone_empresa">
-        </div>
-        <div class="form-field">
-          <label for="email_empresa">E-mail (empresa)</label>
-          <input type="email" id="email_empresa">
         </div>
       </div>
 
@@ -169,10 +183,10 @@
       <table class="admin-table">
         <thead>
           <tr>
-            <th>Razão Social</th>
-            <th>Nome Fantasia</th>
-            <th>CNPJ/CPF</th>
+            <th>Nome</th>
+            <th>Categoria</th>
             <th>Contato</th>
+            <th>CNPJ/CPF</th>
             <th></th>
           </tr>
         </thead>
@@ -196,10 +210,16 @@
   </div>
 </div>
 
-<!-- MODAL HISTÓRICO DE COMPRAS -->
+<!-- MODAL HISTÓRICO DE FOLLOW-UP -->
 <div class="modal-overlay no-print" id="modal-historico">
   <div class="modal-box" style="max-width:720px;">
-    <h3>Histórico de Compras — <span id="historico-cliente-nome"></span></h3>
+    <h3>Histórico de follow-up — <span id="historico-cliente-nome"></span></h3>
+    <div class="form-field" style="margin-bottom:12px;">
+      <textarea id="historico-nova-anotacao" rows="2" placeholder="Registrar novo contato/anotação..."></textarea>
+    </div>
+    <div class="form-actions" style="margin-bottom:16px;">
+      <button type="button" class="btn btn-primary" id="historico-btn-adicionar">Adicionar</button>
+    </div>
     <div id="historico-conteudo">Carregando...</div>
     <div class="form-actions">
       <button type="button" class="btn btn-outline" id="historico-btn-imprimir">Imprimir</button>
@@ -211,39 +231,13 @@
 <!-- ÁREA DE IMPRESSÃO (histórico do cliente) -->
 <div class="print-sheet" id="print-sheet"></div>
 
-<!-- MODAL TRANSFERIR E EXCLUIR (cadastro duplicado com pedidos/orçamentos vinculados) -->
-<div class="modal-overlay" id="modal-merge-cliente">
-  <div class="modal-box" style="max-width:480px;">
-    <h3>Não foi possível excluir</h3>
-    <p style="margin-bottom:16px; color:var(--gray-700);">
-      <strong id="merge-cliente-nome"></strong> possui pedidos/orçamentos vinculados no histórico.
-      Para excluir esse cadastro duplicado, transfira o histórico dele para o cadastro correto primeiro.
-    </p>
-    <div class="form-field" style="margin-bottom:16px;">
-      <label for="merge-cliente-destino">Transferir histórico para</label>
-      <select id="merge-cliente-destino"></select>
-    </div>
-    <p id="merge-cliente-error" class="error-message" style="display:none;"></p>
-    <div class="form-actions">
-      <button type="button" class="btn btn-primary" id="merge-cliente-confirmar">Transferir e excluir</button>
-      <button type="button" class="btn btn-outline" id="merge-cliente-cancelar">Cancelar</button>
-    </div>
-    <p style="margin-top:20px; padding-top:16px; border-top:1px solid var(--off-white); color:var(--gray-400); font-size:0.85rem;">
-      Ou, se preferir não manter esse histórico:
-    </p>
-    <div class="form-actions">
-      <button type="button" class="btn" style="background:#a92323; color:#fff;" id="merge-cliente-so-excluir">Excluir mesmo assim (perde o histórico)</button>
-    </div>
-  </div>
-</div>
-
 <!-- MODAL IMPORTAR PLANILHA DE CLIENTES -->
 <div class="modal-overlay" id="modal-importar-cliente">
   <div class="modal-box" style="max-width:680px;">
     <h3>Importar Clientes via Planilha</h3>
     <p style="font-size:0.85rem; color:var(--gray-700); margin-bottom:14px;">
       Use o modelo (botão "Baixar modelo de importação"), preencha as linhas e envie o arquivo .xlsx aqui.
-      Só a Razão Social é obrigatória. Se o CNPJ/CPF já existir num cliente cadastrado, os dados desse cliente são atualizados em vez de criar um duplicado.
+      Nome é obrigatório, junto com pelo menos telefone ou e-mail. Se o CNPJ/CPF já existir num cliente cadastrado, os dados desse cliente são atualizados em vez de criar um duplicado.
     </p>
     <div class="form-field" style="margin-bottom:14px;">
       <label for="importar-cliente-arquivo">Arquivo (.xlsx)</label>
@@ -261,14 +255,13 @@
 <div id="toast-container"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="js/admin-config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
 <script src="js/toast.js"></script>
-<script src="js/historico.js"></script>
 <script src="js/cnpj.js"></script>
 <script src="js/planilha.js"></script>
+<script src="js/historico.js"></script>
 <script src="js/clientes.js"></script>
 </body>
 </html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — CRP</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../assets/img/logo-full.png" type="image/png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+<style>
+  .dash-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; }
+  .dash-quad h2 { display:flex; align-items:center; justify-content:space-between; margin-top:0; }
+  .dash-count { font-size:1.6rem; font-weight:800; color:var(--navy-900, #0d2340); }
+  .dash-quick-form { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+  .dash-quick-form input { padding:8px 10px; border-radius:6px; border:1px solid #d7ddea; }
+  .dash-link { font-size:0.82rem; }
+</style>
+</head>
+<body class="admin-body">
+
+<header class="admin-header">
+  <div class="admin-brand">CRP</div>
+  <nav class="admin-nav">
+    <a href="dashboard.html" class="active">Dashboard</a>
+    <a href="clientes.html" data-role="atendente">Clientes</a>
+    <a href="vendas.html" data-role="atendente">Vendas</a>
+    <a href="pos-venda.html" data-role="atendente">Pós-venda</a>
+    <a href="assistencia-tecnica.html" data-role="tecnico">Assistência Técnica</a>
+    <a href="estoque.html" data-role="tecnico">Estoque</a>
+    <a href="manutencao.html" data-role="tecnico">Manutenção</a>
+    <a href="usuarios.html" data-role="admin">Usuários</a>
+  </nav>
+  <div class="admin-user">
+    <span>Olá, <span data-user-name>—</span></span>
+    <a href="trocar-senha.html" style="color:#cfd9ea; font-size:0.85rem;">Trocar senha</a>
+    <button data-logout>Sair</button>
+  </div>
+</header>
+
+<main class="admin-main">
+  <h1 class="admin-title">Dashboard</h1>
+
+  <div class="dash-grid">
+
+    <div class="admin-card dash-quad" id="quad-venda" data-role="atendente">
+      <h2>Vendas <span class="dash-count" id="quad-count-venda">—</span></h2>
+      <form class="dash-quick-form" id="quad-form-venda">
+        <input type="text" id="quad-nome-venda" placeholder="Nome *" required>
+        <input type="text" id="quad-telefone-venda" placeholder="Telefone">
+        <input type="email" id="quad-email-venda" placeholder="E-mail">
+        <p id="quad-error-venda" class="error-message" style="display:none;"></p>
+        <button type="submit" class="btn btn-primary">+ Novo em Vendas</button>
+      </form>
+      <div id="quad-lista-venda">Carregando...</div>
+      <p class="dash-link"><a href="vendas.html">Ver tudo em Vendas →</a></p>
+    </div>
+
+    <div class="admin-card dash-quad" id="quad-manutencao" data-role="tecnico">
+      <h2>Manutenção <span class="dash-count" id="quad-count-manutencao">—</span></h2>
+      <form class="dash-quick-form" id="quad-form-manutencao">
+        <input type="text" id="quad-nome-manutencao" placeholder="Nome *" required>
+        <input type="text" id="quad-telefone-manutencao" placeholder="Telefone">
+        <input type="email" id="quad-email-manutencao" placeholder="E-mail">
+        <p id="quad-error-manutencao" class="error-message" style="display:none;"></p>
+        <button type="submit" class="btn btn-primary">+ Novo em Manutenção</button>
+      </form>
+      <div id="quad-lista-manutencao">Carregando...</div>
+      <p class="dash-link"><a href="manutencao.html">Ver tudo em Manutenção →</a></p>
+    </div>
+
+    <div class="admin-card dash-quad" id="quad-pos_venda" data-role="atendente">
+      <h2>Pós-venda / Follow-up <span class="dash-count" id="quad-count-pos_venda">—</span></h2>
+      <form class="dash-quick-form" id="quad-form-pos_venda">
+        <input type="text" id="quad-nome-pos_venda" placeholder="Nome *" required>
+        <input type="text" id="quad-telefone-pos_venda" placeholder="Telefone">
+        <input type="email" id="quad-email-pos_venda" placeholder="E-mail">
+        <p id="quad-error-pos_venda" class="error-message" style="display:none;"></p>
+        <button type="submit" class="btn btn-primary">+ Novo em Pós-venda</button>
+      </form>
+      <div id="quad-lista-pos_venda">Carregando...</div>
+      <p class="dash-link"><a href="pos-venda.html">Ver tudo em Pós-venda →</a></p>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/admin-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>
