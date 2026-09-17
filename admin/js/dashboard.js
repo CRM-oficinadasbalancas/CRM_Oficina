@@ -6,6 +6,19 @@ var QUADRANTES = [
   { categoria: 'pos_venda', label: 'Pós-venda / Follow-up', pagina: 'pos-venda.html' }
 ];
 
+function inicioDeHoje() {
+  var d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function labelResultado(categoria, resultado) {
+  if (!resultado) return 'Contato registrado';
+  var labels = RESULTADO_LABELS_POR_CATEGORIA[categoria];
+  if (labels && labels[resultado]) return labels[resultado];
+  return resultado === 'positivo' ? 'Positivo' : 'Negativo';
+}
+
 async function carregarQuadrante(quadrante) {
   var { data: clientes, error } = await supabaseClient
     .from('clientes')
@@ -39,6 +52,35 @@ async function carregarQuadrante(quadrante) {
     if (!historicoPorCliente[h.cliente_id]) historicoPorCliente[h.cliente_id] = [];
     historicoPorCliente[h.cliente_id].push(h);
   });
+
+  // --- Tratado hoje: contatos registrados no dia, mais recentes primeiro ---
+  var hoje = inicioDeHoje();
+  var clientesPorId = {};
+  clientes.forEach(function (c) { clientesPorId[c.id] = c; });
+
+  var tratadoHoje = (historico || [])
+    .filter(function (h) { return new Date(h.created_at) >= hoje; })
+    .sort(function (a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+
+  var tratadoEl = document.getElementById('quad-tratado-' + quadrante.categoria);
+  if (tratadoEl) {
+    if (!tratadoHoje.length) {
+      tratadoEl.innerHTML = '<p style="color:var(--gray-400); font-size:0.85rem;">Nenhum contato registrado hoje ainda.</p>';
+    } else {
+      tratadoEl.innerHTML = tratadoHoje.map(function (h) {
+        var cliente = clientesPorId[h.cliente_id];
+        var horaStr = new Date(h.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        var badgeClasse = h.resultado === 'positivo' ? 'badge-ok' : (h.resultado === 'negativo' ? 'badge-danger' : 'badge-warning');
+        return '<div style="padding:8px 0; border-bottom:1px solid var(--off-white);">' +
+          '<strong>' + (cliente ? cliente.razao_social : '—') + '</strong> ' +
+          '<span class="badge ' + badgeClasse + '">' + labelResultado(quadrante.categoria, h.resultado) + '</span><br>' +
+          '<span style="font-size:0.78rem; color:var(--gray-400);">' + horaStr + '</span>' +
+        '</div>';
+      }).join('');
+    }
+  }
+  var contagemTratadoEl = document.getElementById('quad-count-tratado-' + quadrante.categoria);
+  if (contagemTratadoEl) contagemTratadoEl.textContent = tratadoHoje.length;
 
   var comPrazo = clientes.map(function (c) {
     return { cliente: c, retorno: calcularProximoRetorno(c, historicoPorCliente[c.id] || []) };

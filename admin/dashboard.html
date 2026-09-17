@@ -16,6 +16,8 @@
   .dash-quick-form { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
   .dash-quick-form input { padding:8px 10px; border-radius:6px; border:1px solid #d7ddea; }
   .dash-link { font-size:0.82rem; }
+  .dash-subtitle { display:flex; align-items:center; gap:8px; font-size:0.9rem; text-transform:uppercase; letter-spacing:0.03em; color:var(--gray-400); margin:18px 0 6px; }
+  .dash-count-sm { font-size:0.85rem; font-weight:700; color:var(--navy-900, #0d2340); background:var(--off-white); border-radius:10px; padding:1px 8px; }
 </style>
 </head>
 <body class="admin-body">
@@ -26,10 +28,10 @@
     <a href="dashboard.html" class="active">Dashboard</a>
     <a href="clientes.html" data-role="atendente">Clientes</a>
     <a href="vendas.html" data-role="atendente">Vendas</a>
+    <a href="manutencao.html" data-role="tecnico">Manutenção</a>
     <a href="pos-venda.html" data-role="atendente">Pós-venda</a>
     <a href="assistencia-tecnica.html" data-role="tecnico">Assistência Técnica</a>
     <a href="estoque.html" data-role="tecnico">Estoque</a>
-    <a href="manutencao.html" data-role="tecnico">Manutenção</a>
     <a href="usuarios.html" data-role="admin">Usuários</a>
   </nav>
   <div class="admin-user">
@@ -53,6 +55,11 @@
         <p id="quad-error-venda" class="error-message" style="display:none;"></p>
         <button type="submit" class="btn btn-primary">+ Novo em Vendas</button>
       </form>
+
+      <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-venda">—</span></h3>
+      <div id="quad-tratado-venda">Carregando...</div>
+
+      <h3 class="dash-subtitle">Pendente</h3>
       <div id="quad-lista-venda">Carregando...</div>
       <p class="dash-link"><a href="vendas.html">Ver tudo em Vendas →</a></p>
     </div>
@@ -66,6 +73,11 @@
         <p id="quad-error-manutencao" class="error-message" style="display:none;"></p>
         <button type="submit" class="btn btn-primary">+ Novo em Manutenção</button>
       </form>
+
+      <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-manutencao">—</span></h3>
+      <div id="quad-tratado-manutencao">Carregando...</div>
+
+      <h3 class="dash-subtitle">Pendente</h3>
       <div id="quad-lista-manutencao">Carregando...</div>
       <p class="dash-link"><a href="manutencao.html">Ver tudo em Manutenção →</a></p>
     </div>
@@ -79,6 +91,11 @@
         <p id="quad-error-pos_venda" class="error-message" style="display:none;"></p>
         <button type="submit" class="btn btn-primary">+ Novo em Pós-venda</button>
       </form>
+
+      <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-pos_venda">—</span></h3>
+      <div id="quad-tratado-pos_venda">Carregando...</div>
+
+      <h3 class="dash-subtitle">Pendente</h3>
       <div id="quad-lista-pos_venda">Carregando...</div>
       <p class="dash-link"><a href="pos-venda.html">Ver tudo em Pós-venda →</a></p>
     </div>
