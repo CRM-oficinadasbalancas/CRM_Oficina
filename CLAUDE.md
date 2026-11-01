@@ -15,7 +15,7 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
 - Claude NUNCA digita senhas, chaves de API nem tokens (RESEND_API_KEY, service_role etc.): o usuário roda/define.
 - Não commitar dados reais de leads. A importação da planilha já foi feita direto no banco (826 clientes, 866 históricos).
 - Homologação: o usuário só testa; dados novos ficam fora até liberar uso real.
-- Login é por usuário (e-mail sintético `usuario@oficinadasbalancas.internal`); perfis Admin / Técnico / Atendente; troca de senha obrigatória no 1º login.
+- Login é por usuário (e-mail sintético `usuario@oficinadasbalancas.internal`); perfis Admin / Técnico / Atendente / Vendedor (vendedor: só Vendas, Manutenção e Pós-venda; edita clientes, histórico e status); troca de senha obrigatória no 1º login.
 
 ## Modelo
 - `clientes`: nome + (telefone ou e-mail); `categoria` (venda | manutencao | pos_venda | null) define o funil;
@@ -36,7 +36,7 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
    logo e favicon em `assets/img/`. Se a Oficina tiver a logo branca oficial, trocar `logo-oficina-branca.png` (hoje gerada da logo do site).
 3. Domínio próprio da Oficina: hospedagem e verificar domínio no Resend; depois trocar `GERENTE_EMAIL` na edge function
    para `lucasbalancas@hotmail.com` e o remetente (hoje vai para `crm.oficinadasbalancas@gmail.com` via `onboarding@resend.dev`).
-4. (feito no banco — migration 0012) RLS por perfil via `private.meu_perfil()`: admin tudo; atendente = clientes/histórico (+ lê AT);
+4. (feito no banco — migration 0012) RLS por perfil via `private.meu_perfil()` (migrations 0012/0013): admin tudo; **excluir cliente = só admin**; vendedor/atendente = clientes/histórico (atendente também lê AT);
    técnico = clientes/histórico + AT/equipamentos/estoque; profiles só admin (cada um edita o próprio sem mudar role); alertas_enviados só service_role.
    Falta: testar cada tela logado com um usuário Técnico e um Atendente de verdade.
 5. Ligar a proteção contra senhas vazadas no Supabase Auth; avaliar Pro/keep-alive por causa da pausa do free tier.
