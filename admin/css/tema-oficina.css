@@ -25,6 +25,7 @@ body, body.admin-body { font-family: var(--font-body); }
 :root { --sidebar-w: 240px; }
 
 body.admin-body { padding-left: var(--sidebar-w); }
+.admin-main { min-width: 0; }
 
 .admin-header {
   position: fixed;
@@ -41,7 +42,10 @@ body.admin-body { padding-left: var(--sidebar-w); }
   color: #fff;
   border-right: 2px solid var(--oficina-vermelho);
   overflow-y: auto;
+  scrollbar-width: none;           /* Firefox */
+  -ms-overflow-style: none;        /* Edge antigo */
 }
+.admin-header::-webkit-scrollbar { display: none; }  /* Chrome/Edge/Safari */
 .admin-brand { display: flex; justify-content: center; align-items: center; padding: 6px 6px 18px; border-bottom: 1px solid #2c2c28; }
 .admin-brand img { display: block; height: auto; width: 100%; max-width: 190px; margin: 0 auto; }
 

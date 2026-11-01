@@ -247,7 +247,7 @@ async function carregarQuadrante(quadrante) {
       var badge = h.status
         ? '<span class="badge ' + STATUS_HISTORICO_BADGE[h.status] + '">' + STATUS_HISTORICO_LABELS[h.status] + '</span>'
         : '<span class="badge ' + (h.resultado === 'positivo' ? 'badge-ok' : (h.resultado === 'negativo' ? 'badge-danger' : 'badge-warning')) + '">' + labelResultado(quadrante.categoria, h.resultado) + '</span>';
-      return '<div class="dash-row dash-row-verde">' +
+      return '<div class="dash-row dash-row-trat dash-row-verde">' +
         '<span class="dash-row-nome">' + (cliente ? linkCliente(cliente) : '—') + '</span>' +
         badge + '<span class="dash-row-meta">' + horaStr + '</span></div>';
     }).join('');
@@ -285,9 +285,9 @@ async function carregarQuadrante(quadrante) {
     var prazo = formatarPrazo(item.retorno);
     var c = item.cliente;
     var meta = [c.telefone_empresa, c.canal_aquisicao].filter(Boolean).join(' · ');
-    return '<div class="dash-row dash-row-' + classificarUrgencia(item.retorno) + '">' +
+    return '<div class="dash-row dash-row-pend dash-row-' + classificarUrgencia(item.retorno) + '">' +
       '<span class="dash-row-nome">' + linkCliente(c) + '</span>' +
-      (meta ? '<span class="dash-row-meta">' + escHtml(meta) + '</span>' : '') +
+      '<span class="dash-row-meta" title="' + escHtml(meta) + '">' + escHtml(meta) + '</span>' +
       '<span class="badge ' + (prazo.classe || '') + '">' + prazo.texto + '</span></div>';
   }).join('');
   ligarLinksCliente(listaEl);
