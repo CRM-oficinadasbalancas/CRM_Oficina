@@ -25,6 +25,9 @@ function garantirModalDetalhe() {
     '<div class="modal-box" style="max-width:760px;">' +
       '<h3 id="det-titulo">Cliente</h3>' +
       '<div class="form-grid" style="margin-bottom:12px;">' +
+        '<div class="form-field"><label for="det-tipo">Tipo *</label><select id="det-tipo">' +
+          '<option value="false">Lead (funis)</option><option value="true">Cliente da Oficina (Assistência Técnica)</option>' +
+        '</select></div>' +
         '<div class="form-field span-2"><label for="det-nome">Nome *</label><input type="text" id="det-nome"></div>' +
         '<div class="form-field"><label for="det-telefone">Telefone</label><input type="text" id="det-telefone"></div>' +
         '<div class="form-field"><label for="det-email">E-mail</label><input type="email" id="det-email"></div>' +
@@ -34,9 +37,6 @@ function garantirModalDetalhe() {
           '<option value="venda">Venda</option><option value="manutencao">Manutenção</option><option value="pos_venda">Pós-venda</option>' +
         '</select></div>' +
         '<div class="form-field"><label for="det-situacao">Situação</label><select id="det-situacao"></select></div>' +
-        '<div class="form-field"><label for="det-tipo">Tipo</label><select id="det-tipo">' +
-          '<option value="false">Lead (funis)</option><option value="true">Cliente da Oficina (Assistência Técnica)</option>' +
-        '</select></div>' +
       '</div>' +
       '<p id="det-erro" class="error-message" style="display:none;"></p>' +
       '<div class="form-actions" style="margin-bottom:8px;">' +
@@ -78,6 +78,15 @@ function garantirModalDetalhe() {
   document.getElementById('det-add-cancelar').addEventListener('click', function () { mostrarAddInfo(false); });
   document.getElementById('det-add-salvar').addEventListener('click', salvarInformacaoDetalhe);
   document.getElementById('det-categoria').addEventListener('change', configurarResultadoDetalhe);
+  document.getElementById('det-tipo').addEventListener('change', atualizarCamposDetalhePorTipo);
+}
+
+// Cliente da Oficina não usa funil nem canal: esconde (valores gravados ficam intactos).
+function atualizarCamposDetalhePorTipo() {
+  var ehCliente = document.getElementById('det-tipo').value === 'true';
+  ['det-canal', 'det-categoria'].forEach(function (id) {
+    document.getElementById(id).closest('.form-field').style.display = ehCliente ? 'none' : '';
+  });
 }
 
 function mostrarAddInfo(abrir) {
@@ -126,6 +135,7 @@ async function abrirClienteDetalhe(clienteId, opcoes) {
   document.getElementById('det-categoria').value = data.categoria || '';
   document.getElementById('det-situacao').innerHTML = opcoesSituacaoHtml(data.situacao || 'ativo');
   document.getElementById('det-tipo').value = String(!!data.eh_cliente);
+  atualizarCamposDetalhePorTipo();
   document.getElementById('det-cadastro').href = 'clientes.html?editar=' + data.id;
   document.getElementById('det-erro').style.display = 'none';
   mostrarAddInfo(false);

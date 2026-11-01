@@ -10,6 +10,16 @@ var fieldIds = [
   'forma_pagamento_padrao', 'local_entrega_preferencial', 'observacoes'
 ];
 
+// Tipo "Cliente da Oficina" não usa funil nem canal de aquisição: esconde os
+// campos (os valores já gravados ficam intactos, só não aparecem).
+function atualizarCamposPorTipo() {
+  var ehCliente = document.getElementById('eh_cliente').value === 'true';
+  ['categoria', 'canal_aquisicao'].forEach(function (id) {
+    document.getElementById(id).closest('.form-field').style.display = ehCliente ? 'none' : '';
+  });
+}
+document.getElementById('eh_cliente').addEventListener('change', atualizarCamposPorTipo);
+
 function getFormValues() {
   var values = {};
   fieldIds.forEach(function (id) {
@@ -24,6 +34,7 @@ function setFormValues(cliente) {
   fieldIds.forEach(function (id) {
     document.getElementById(id).value = cliente && cliente[id] != null ? String(cliente[id]) : (id === 'eh_cliente' ? 'false' : '');
   });
+  atualizarCamposPorTipo();
 }
 
 function resetForm() {
@@ -32,6 +43,7 @@ function resetForm() {
   document.getElementById('form-title').textContent = 'Novo cliente';
   document.getElementById('cliente-error').style.display = 'none';
   document.getElementById('cnpj-status').textContent = 'Opcional.';
+  atualizarCamposPorTipo();
 }
 
 function normalizarCnpj(v) {
@@ -284,6 +296,7 @@ document.getElementById('cliente-cancel-btn').addEventListener('click', resetFor
     iniciarEdicaoClientePorId(editarId);
   } else if (params.get('novo') === 'cliente') {
     document.getElementById('eh_cliente').value = 'true'; // vindo da Assistência Técnica
+    atualizarCamposPorTipo();
   }
 })();
 

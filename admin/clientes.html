@@ -43,6 +43,13 @@
       <input type="hidden" id="cliente-id">
 
       <div class="form-grid" style="margin-bottom:20px;">
+        <div class="form-field">
+          <label for="eh_cliente">Tipo * <span style="font-weight:400; color:var(--gray-400);">— defina primeiro</span></label>
+          <select id="eh_cliente">
+            <option value="false">Lead (funis)</option>
+            <option value="true">Cliente da Oficina (Assistência Técnica)</option>
+          </select>
+        </div>
         <div class="form-field span-2">
           <label for="razao_social">Nome *</label>
           <input type="text" id="razao_social" required>
@@ -63,13 +70,6 @@
         <div class="form-field">
           <label for="situacao">Situação</label>
           <select id="situacao"></select>
-        </div>
-        <div class="form-field">
-          <label for="eh_cliente">Tipo</label>
-          <select id="eh_cliente">
-            <option value="false">Lead (funis)</option>
-            <option value="true">Cliente da Oficina (Assistência Técnica)</option>
-          </select>
         </div>
       </div>
 
