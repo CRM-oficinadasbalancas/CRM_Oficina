@@ -22,8 +22,10 @@ function labelResultado(categoria, resultado) {
 async function carregarQuadrante(quadrante) {
   var { data: clientes, error } = await supabaseClient
     .from('clientes')
-    .select('id, razao_social, telefone_empresa, email_empresa, created_at, categoria')
-    .eq('categoria', quadrante.categoria);
+    .select('id, razao_social, telefone_empresa, email_empresa, created_at, categoria, situacao, cliente_historico(created_at, resultado)')
+    .eq('categoria', quadrante.categoria)
+    .eq('situacao', 'ativo')
+    .order('created_at', { referencedTable: 'cliente_historico', ascending: true });
 
   if (error) {
     showToast('Erro ao carregar ' + quadrante.label + ': ' + error.message, 'error');
@@ -34,23 +36,13 @@ async function carregarQuadrante(quadrante) {
   var contagemEl = document.getElementById('quad-count-' + quadrante.categoria);
   contagemEl.textContent = clientes.length;
 
-  if (!clientes.length) {
-    document.getElementById('quad-lista-' + quadrante.categoria).innerHTML =
-      '<p style="color:var(--gray-400); font-size:0.85rem;">Nenhum cliente neste funil ainda.</p>';
-    return;
-  }
-
-  var ids = clientes.map(function (c) { return c.id; });
-  var { data: historico } = await supabaseClient
-    .from('cliente_historico')
-    .select('cliente_id, created_at, resultado')
-    .in('cliente_id', ids)
-    .order('created_at', { ascending: true });
-
   var historicoPorCliente = {};
-  (historico || []).forEach(function (h) {
-    if (!historicoPorCliente[h.cliente_id]) historicoPorCliente[h.cliente_id] = [];
-    historicoPorCliente[h.cliente_id].push(h);
+  var historico = [];
+  clientes.forEach(function (c) {
+    historicoPorCliente[c.id] = c.cliente_historico || [];
+    historicoPorCliente[c.id].forEach(function (h) {
+      historico.push({ cliente_id: c.id, created_at: h.created_at, resultado: h.resultado });
+    });
   });
 
   // --- Tratado hoje: contatos registrados no dia, mais recentes primeiro ---
@@ -58,7 +50,7 @@ async function carregarQuadrante(quadrante) {
   var clientesPorId = {};
   clientes.forEach(function (c) { clientesPorId[c.id] = c; });
 
-  var tratadoHoje = (historico || [])
+  var tratadoHoje = historico
     .filter(function (h) { return new Date(h.created_at) >= hoje; })
     .sort(function (a, b) { return new Date(b.created_at) - new Date(a.created_at); });
 

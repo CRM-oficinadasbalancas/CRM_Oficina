@@ -35,6 +35,11 @@ function calcularProximoRetorno(cliente, historico) {
   var categoria = cliente.categoria;
   historico = historico || [];
 
+  // Lead já encerrado (ganho/perdido) não gera mais retorno.
+  if (cliente.situacao && cliente.situacao !== 'ativo') {
+    return { data: null, prioridadeMaxima: false, concluido: true, situacao: cliente.situacao };
+  }
+
   if (categoria === 'venda') {
     if (!historico.length) {
       return { data: addHoras(new Date(cliente.created_at), HORAS_VENDAS[0]), prioridadeMaxima: false, concluido: false };
@@ -85,6 +90,8 @@ function calcularProximoRetorno(cliente, historico) {
 
 // Texto curto pra exibir na UI (badge de prazo).
 function formatarPrazo(retorno) {
+  if (retorno.situacao === 'ganho') return { texto: 'Ganho', classe: 'badge-ok' };
+  if (retorno.situacao === 'perdido') return { texto: 'Perdido', classe: '' };
   if (retorno.concluido) return { texto: 'Concluído', classe: 'badge-ok' };
   if (retorno.prioridadeMaxima) return { texto: 'Precisa de contato', classe: 'badge-danger' };
   if (!retorno.data) return { texto: '—', classe: '' };
@@ -110,3 +117,18 @@ var RESULTADO_LABELS_POR_CATEGORIA = {
   manutencao: { positivo: 'Fechou o serviço', negativo: 'Não fechou' },
   pos_venda: { positivo: 'Retorno positivo', negativo: 'Retorno negativo' }
 };
+
+// Canal de aquisição do lead (de onde ele veio) e situação do lead no funil.
+var CANAIS_AQUISICAO = ['Google Ads', 'Instagram', 'Facebook', 'Meta Ads', 'Indicação', 'Cliente antigo', 'Passou em frente', 'Outro'];
+var SITUACAO_LABELS = { ativo: 'Ativo', ganho: 'Ganho', perdido: 'Perdido' };
+
+function opcoesCanalHtml(selecionado) {
+  return '<option value="">—</option>' + CANAIS_AQUISICAO.map(function (c) {
+    return '<option value="' + c + '"' + (c === selecionado ? ' selected' : '') + '>' + c + '</option>';
+  }).join('');
+}
+function opcoesSituacaoHtml(selecionada) {
+  return Object.keys(SITUACAO_LABELS).map(function (s) {
+    return '<option value="' + s + '"' + (s === selecionada ? ' selected' : '') + '>' + SITUACAO_LABELS[s] + '</option>';
+  }).join('');
+}

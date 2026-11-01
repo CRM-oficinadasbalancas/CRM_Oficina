@@ -33,7 +33,7 @@ const CATEGORIA_LABEL: Record<string, string> = {
 interface HistoricoEntry { created_at: string; resultado: string | null; }
 interface Cliente {
   id: string; razao_social: string; categoria: string; created_at: string;
-  telefone_empresa: string | null; email_empresa: string | null;
+  telefone_empresa: string | null; email_empresa: string | null; situacao?: string;
 }
 interface Retorno { data: Date | null; prioridadeMaxima: boolean; concluido: boolean; }
 
@@ -48,6 +48,11 @@ function addDias(data: Date, dias: number): Date {
 // duas versões em sincronia se a regra de cadência mudar.
 function calcularProximoRetorno(cliente: Cliente, historico: HistoricoEntry[]): Retorno {
   const categoria = cliente.categoria;
+
+  // Ganho ou perdido: encerrado, não precisa mais de retorno.
+  if (cliente.situacao && cliente.situacao !== 'ativo') {
+    return { data: null, prioridadeMaxima: false, concluido: true };
+  }
 
   if (categoria === 'venda') {
     if (!historico.length) {
@@ -141,8 +146,10 @@ Deno.serve(async () => {
 
   const { data: clientes, error: clientesErro } = await supabase
     .from('clientes')
-    .select('id, razao_social, categoria, created_at, telefone_empresa, email_empresa')
-    .not('categoria', 'is', null);
+    .select('id, razao_social, categoria, created_at, telefone_empresa, email_empresa, situacao')
+    .not('categoria', 'is', null)
+    .eq('situacao', 'ativo')
+    .eq('origem', 'manual'); // leads importados da planilha não disparam alertas
 
   if (clientesErro) {
     return new Response(JSON.stringify({ ok: false, error: clientesErro.message }), { status: 500 });

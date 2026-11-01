@@ -13,9 +13,10 @@ var clienteEmHistorico = null;
 async function loadPipeline() {
   var { data, error } = await supabaseClient
     .from('clientes')
-    .select('*')
+    .select('*, cliente_historico(created_at, resultado)')
     .eq('categoria', PIPELINE_CATEGORIA)
-    .order('razao_social', { ascending: true });
+    .order('razao_social', { ascending: true })
+    .order('created_at', { referencedTable: 'cliente_historico', ascending: true });
 
   if (error) {
     showToast('Erro ao carregar ' + PIPELINE_LABEL.toLowerCase() + ': ' + error.message, 'error');
@@ -24,28 +25,19 @@ async function loadPipeline() {
 
   pipelineClientes = data || [];
   pipelineHistoricoPorCliente = {};
-
-  if (pipelineClientes.length) {
-    var ids = pipelineClientes.map(function (c) { return c.id; });
-    var { data: historico } = await supabaseClient
-      .from('cliente_historico')
-      .select('cliente_id, created_at, resultado')
-      .in('cliente_id', ids)
-      .order('created_at', { ascending: true });
-
-    (historico || []).forEach(function (h) {
-      if (!pipelineHistoricoPorCliente[h.cliente_id]) pipelineHistoricoPorCliente[h.cliente_id] = [];
-      pipelineHistoricoPorCliente[h.cliente_id].push(h);
-    });
-  }
+  pipelineClientes.forEach(function (c) {
+    pipelineHistoricoPorCliente[c.id] = c.cliente_historico || [];
+  });
 
   renderPipelineTable();
 }
 
 function renderPipelineTable() {
   var tbody = document.getElementById('pipeline-tbody');
-  if (!pipelineClientes.length) {
-    tbody.innerHTML = '<tr><td colspan="5">Nenhum cliente em ' + PIPELINE_LABEL + ' ainda.</td></tr>';
+  var filtro = document.getElementById('pipeline-filtro-situacao').value;
+  var visiveis = pipelineClientes.filter(function (c) { return !filtro || c.situacao === filtro; });
+  if (!visiveis.length) {
+    tbody.innerHTML = '<tr><td colspan="7">Nenhum cliente neste filtro em ' + PIPELINE_LABEL + '.</td></tr>';
     return;
   }
 
@@ -53,7 +45,7 @@ function renderPipelineTable() {
     return '<option value="' + cat + '">' + CATEGORIA_LABELS_PIPELINE[cat] + '</option>';
   }).join('');
 
-  var comPrazo = pipelineClientes.map(function (c) {
+  var comPrazo = visiveis.map(function (c) {
     var retorno = calcularProximoRetorno(c, pipelineHistoricoPorCliente[c.id] || []);
     return { cliente: c, retorno: retorno };
   });
@@ -76,7 +68,9 @@ function renderPipelineTable() {
     return '<tr>' +
       '<td>' + (c.razao_social || '') + '</td>' +
       '<td>' + contato + '</td>' +
+      '<td>' + (c.canal_aquisicao || '—') + '</td>' +
       '<td>' + badgePrazo + '</td>' +
+      '<td><select data-situacao="' + c.id + '">' + opcoesSituacaoHtml(c.situacao) + '</select></td>' +
       '<td><select data-mover="' + c.id + '">' + opcoesCategoria.replace(
         'value="' + PIPELINE_CATEGORIA + '"', 'value="' + PIPELINE_CATEGORIA + '" selected'
       ) + '</select></td>' +
@@ -93,6 +87,19 @@ function renderPipelineTable() {
       var cliente = pipelineClientes.find(function (c) { return c.id === btn.dataset.historico; });
       if (!cliente) return;
       abrirHistoricoFollowup(cliente);
+    });
+  });
+
+  tbody.querySelectorAll('[data-situacao]').forEach(function (select) {
+    select.addEventListener('change', async function () {
+      var { error } = await supabaseClient.from('clientes')
+        .update({ situacao: select.value }).eq('id', select.dataset.situacao);
+      if (error) {
+        showToast('Erro ao atualizar situação: ' + error.message, 'error');
+        return;
+      }
+      showToast('Situação atualizada para ' + SITUACAO_LABELS[select.value] + '.', 'ok');
+      loadPipeline();
     });
   });
 
@@ -204,6 +211,7 @@ document.getElementById('pipeline-form').addEventListener('submit', async functi
     razao_social: nome,
     telefone_empresa: telefone || null,
     email_empresa: email || null,
+    canal_aquisicao: document.getElementById('pipeline-canal').value || null,
     categoria: PIPELINE_CATEGORIA,
     created_by: currentUserId
   });
@@ -221,6 +229,9 @@ document.getElementById('pipeline-form').addEventListener('submit', async functi
   showToast('Contato adicionado.', 'ok');
   loadPipeline();
 });
+
+document.getElementById('pipeline-canal').innerHTML = opcoesCanalHtml('');
+document.getElementById('pipeline-filtro-situacao').addEventListener('change', renderPipelineTable);
 
 (async function () {
   var auth = await window.ADMIN_AUTH_READY;

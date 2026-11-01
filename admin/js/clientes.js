@@ -4,7 +4,7 @@ var allClientes = [];
 var CATEGORIA_LABELS = { venda: 'Venda', manutencao: 'Manutenção', pos_venda: 'Pós-venda' };
 
 var fieldIds = [
-  'codigo', 'cnpj_cpf', 'razao_social', 'nome_fantasia', 'ie', 'categoria',
+  'codigo', 'cnpj_cpf', 'razao_social', 'nome_fantasia', 'ie', 'categoria', 'canal_aquisicao', 'situacao',
   'logradouro', 'numero', 'complemento', 'bairro', 'cep', 'municipio', 'uf',
   'telefone_empresa', 'email_empresa', 'contato_nome', 'contato_telefone', 'contato_email',
   'forma_pagamento_padrao', 'local_entrega_preferencial', 'observacoes'
@@ -15,6 +15,7 @@ function getFormValues() {
   fieldIds.forEach(function (id) {
     values[id] = document.getElementById(id).value.trim() || null;
   });
+  if (!values.situacao) values.situacao = 'ativo'; // coluna not null
   return values;
 }
 
@@ -42,8 +43,9 @@ var historicoPorClienteMap = {};
 async function loadClientes() {
   var { data, error } = await supabaseClient
     .from('clientes')
-    .select('*')
-    .order('razao_social', { ascending: true });
+    .select('*, cliente_historico(cliente_id, created_at, resultado)')
+    .order('razao_social', { ascending: true })
+    .order('created_at', { referencedTable: 'cliente_historico', ascending: true });
 
   if (error) {
     showToast('Erro ao carregar clientes: ' + error.message, 'error');
@@ -60,18 +62,9 @@ async function loadClientes() {
   });
 
   historicoPorClienteMap = {};
-  if (allClientes.length) {
-    var ids = allClientes.map(function (c) { return c.id; });
-    var { data: historico } = await supabaseClient
-      .from('cliente_historico')
-      .select('cliente_id, created_at, resultado')
-      .in('cliente_id', ids)
-      .order('created_at', { ascending: true });
-    (historico || []).forEach(function (h) {
-      if (!historicoPorClienteMap[h.cliente_id]) historicoPorClienteMap[h.cliente_id] = [];
-      historicoPorClienteMap[h.cliente_id].push(h);
-    });
-  }
+  allClientes.forEach(function (c) {
+    historicoPorClienteMap[c.id] = c.cliente_historico || [];
+  });
 
   renderClientesTable(allClientes);
 }
@@ -92,7 +85,7 @@ function iniciarEdicaoClientePorId(clienteId) {
 function renderClientesTable(list) {
   var tbody = document.getElementById('clientes-tbody');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="6">Nenhum cliente cadastrado ainda.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">Nenhum cliente cadastrado ainda.</td></tr>';
     return;
   }
 
@@ -101,8 +94,9 @@ function renderClientesTable(list) {
     var cnpjNormalizado = normalizarCnpj(c.cnpj_cpf);
     var badgeDuplicado = (cnpjNormalizado && cnpjDuplicadoMap[cnpjNormalizado] > 1) ? ' <span class="badge badge-warning">CNPJ/CPF duplicado</span>' : '';
     var categoria = c.categoria ? CATEGORIA_LABELS[c.categoria] : '—';
+    var canal = c.canal_aquisicao || '—';
     var prazoTexto = '—';
-    if (c.categoria) {
+    if (c.categoria || (c.situacao && c.situacao !== 'ativo')) {
       var retorno = calcularProximoRetorno(c, historicoPorClienteMap[c.id] || []);
       var prazo = formatarPrazo(retorno);
       prazoTexto = prazo.classe ? '<span class="badge ' + prazo.classe + '">' + prazo.texto + '</span>' : prazo.texto;
@@ -110,6 +104,7 @@ function renderClientesTable(list) {
     return '<tr>' +
       '<td>' + (c.razao_social || '') + badgeDuplicado + '</td>' +
       '<td>' + categoria + '</td>' +
+      '<td>' + canal + '</td>' +
       '<td>' + prazoTexto + '</td>' +
       '<td>' + contato + '</td>' +
       '<td>' + (c.cnpj_cpf || '—') + '</td>' +
@@ -382,6 +377,7 @@ var COLUNAS_CLIENTE = [
   { titulo: 'Nome', chave: 'razao_social' },
   { titulo: 'Nome Fantasia', chave: 'nome_fantasia' },
   { titulo: 'Categoria (venda/manutencao/pos_venda)', chave: 'categoria' },
+  { titulo: 'Canal de Aquisição', chave: 'canal_aquisicao' },
   { titulo: 'Inscrição Estadual', chave: 'ie' },
   { titulo: 'Logradouro', chave: 'logradouro' },
   { titulo: 'Número', chave: 'numero' },
@@ -511,6 +507,7 @@ if (importarClienteBtnConfirmar) importarClienteBtnConfirmar.addEventListener('c
     var linha = linhasImportacaoClienteValidas[i];
     var payload = {};
     fieldIds.forEach(function (chave) { payload[chave] = linha[chave] || null; });
+    if (!payload.situacao) delete payload.situacao; // mantém o padrão do banco (ativo)
 
     var cnpjNormalizado = normalizarCnpj(linha.cnpj_cpf);
     var existente = cnpjNormalizado && allClientes.find(function (c) { return normalizarCnpj(c.cnpj_cpf) === cnpjNormalizado; });
