@@ -60,7 +60,7 @@ async function buscarTodosClientes() {
   for (var inicio = 0; ; inicio += passo) {
     var { data, error } = await supabaseClient
       .from('clientes')
-      .select('categoria, situacao, canal_aquisicao, created_at')
+      .select('categoria, situacao, canal_aquisicao, created_at, eh_cliente')
       .range(inicio, inicio + passo - 1);
     if (error) throw error;
     todos = todos.concat(data || []);
@@ -89,6 +89,9 @@ async function carregarEstatisticas() {
     showToast('Erro ao carregar indicadores: ' + e.message, 'error');
     return;
   }
+
+  // Clientes da Oficina (ativos) não são leads: ficam fora dos indicadores.
+  clientes = clientes.filter(function (c) { return !(c.eh_cliente && c.situacao === 'ativo'); });
 
   var ativos = clientes.filter(function (c) { return c.situacao === 'ativo'; }).length;
   var ganhos = clientes.filter(function (c) { return c.situacao === 'ganho'; }).length;

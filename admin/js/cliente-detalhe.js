@@ -84,7 +84,7 @@ function garantirModalDetalhe() {
 // Cliente da Oficina não usa funil nem canal: esconde (valores gravados ficam intactos).
 function atualizarCamposDetalhePorTipo() {
   var ehCliente = document.getElementById('det-tipo').value === 'true';
-  ['det-canal', 'det-categoria'].forEach(function (id) {
+  ['det-canal', 'det-categoria', 'det-situacao'].forEach(function (id) {
     document.getElementById(id).closest('.form-field').style.display = ehCliente ? 'none' : '';
   });
 }
@@ -190,6 +190,13 @@ async function salvarDadosDetalhe() {
     }
   }
 
+  // Cliente da Oficina é sempre "ativo" e sem funil (exceto lead ganho que foi migrado).
+  var categoriaFinal = document.getElementById('det-categoria').value || null;
+  if (tipoSel.value === 'true' && situacaoNova !== 'ganho') {
+    situacaoNova = 'ativo';
+    categoriaFinal = null;
+  }
+
   var btn = document.getElementById('det-salvar');
   btn.disabled = true;
   var { error } = await supabaseClient.from('clientes').update({
@@ -197,7 +204,7 @@ async function salvarDadosDetalhe() {
     telefone_empresa: tel || null,
     email_empresa: email || null,
     canal_aquisicao: document.getElementById('det-canal').value || null,
-    categoria: document.getElementById('det-categoria').value || null,
+    categoria: categoriaFinal,
     situacao: situacaoNova,
     eh_cliente: tipoSel.value === 'true'
   }).eq('id', detalheCliente.id);
@@ -205,6 +212,9 @@ async function salvarDadosDetalhe() {
 
   if (error) { erroEl.textContent = 'Erro ao salvar: ' + error.message; erroEl.style.display = 'block'; return; }
   detalheCliente.situacao = situacaoNova;
+  document.getElementById('det-situacao').value = situacaoNova;
+  document.getElementById('det-categoria').value = categoriaFinal || '';
+  atualizarCamposDetalhePorTipo();
   document.getElementById('det-titulo').textContent = nome;
   showToast('Dados do cliente salvos.', 'ok');
   avisarMudancaDetalhe();

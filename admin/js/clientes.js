@@ -14,7 +14,7 @@ var fieldIds = [
 // campos (os valores já gravados ficam intactos, só não aparecem).
 function atualizarCamposPorTipo() {
   var ehCliente = document.getElementById('eh_cliente').value === 'true';
-  ['categoria', 'canal_aquisicao'].forEach(function (id) {
+  ['categoria', 'canal_aquisicao', 'situacao'].forEach(function (id) {
     document.getElementById(id).closest('.form-field').style.display = ehCliente ? 'none' : '';
   });
 }
@@ -27,6 +27,12 @@ function getFormValues() {
   });
   if (!values.situacao) values.situacao = 'ativo'; // coluna not null
   values.eh_cliente = document.getElementById('eh_cliente').value === 'true';
+  // Cliente da Oficina é sempre "ativo" e não entra em funil. Exceção: lead que
+  // já era "ganho" e foi migrado — mantém ganho/funil pra não perder a estatística.
+  if (values.eh_cliente && values.situacao !== 'ganho') {
+    values.situacao = 'ativo';
+    values.categoria = null;
+  }
   return values;
 }
 
