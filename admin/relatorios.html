@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatórios — CRM Oficina das Balanças</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="../assets/img/favicon-192.png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="css/tema-oficina.css">
+<style>
+  .rel-filtros { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+  .rel-filtros .form-field { min-width:140px; }
+  .rel-tabs { display:flex; flex-wrap:wrap; gap:8px; margin:20px 0 16px; }
+  .rel-tab { font:inherit; font-weight:700; padding:10px 18px; border-radius:4px; border:1px solid var(--oficina-preto, #1b1b18); background:#fff; color:#1b1b18; cursor:pointer; }
+  .rel-tab.ativo { background:#d93035; border-color:#d93035; color:#fff; }
+  .rel-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:14px; margin-bottom:18px; }
+  .rel-kpi { background:#fff; border-radius:12px; padding:14px 16px; box-shadow:0 4px 16px rgba(0,0,0,0.06); border-top:4px solid #1b1b18; }
+  .rel-kpi span { display:block; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em; color:#8b95a7; font-weight:700; }
+  .rel-kpi strong { display:block; font-size:1.8rem; margin-top:4px; }
+  .rel-acoes { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+  .rel-acoes h2 { margin:0; font-size:1.05rem; }
+  .rel-nota { color:#8b95a7; font-size:0.82rem; margin:0 0 12px; }
+  .barra { display:inline-block; height:10px; background:#d93035; border-radius:3px; vertical-align:middle; margin-right:8px; min-width:2px; }
+  .rel-sub { margin:26px 0 10px; font-size:0.95rem; }
+  td.num, th.num { text-align:right; }
+  .atraso { color:#a92323; font-weight:700; }
+</style>
+</head>
+<body class="admin-body">
+
+<header class="admin-header">
+  <a href="dashboard.html" class="admin-brand"><img src="../assets/img/logo-oficina-branca.png" alt="Oficina das Balanças"></a>
+  <nav class="admin-nav">
+    <a href="dashboard.html" data-role="atendente tecnico">Dashboard</a>
+    <a href="vendas.html" data-role="atendente vendedor">Vendas</a>
+    <a href="manutencao.html" data-role="tecnico vendedor">Manutenção</a>
+    <a href="pos-venda.html" data-role="atendente vendedor">Pós-venda</a>
+    <a href="assistencia-tecnica.html" data-role="tecnico">Assistência Técnica</a>
+    <a href="relatorios.html" class="active" data-role="admin">Relatórios</a>
+    <a href="estoque.html" data-role="admin">Estoque</a>
+    <a href="clientes.html" data-role="atendente">Clientes</a>
+    <a href="usuarios.html" data-role="admin">Usuários</a>
+  </nav>
+  <div class="admin-user">
+    <span>Olá, <span data-user-name>—</span></span>
+    <a href="trocar-senha.html" style="color:#cfd9ea; font-size:0.85rem;">Trocar senha</a>
+    <button data-logout>Sair</button>
+  </div>
+</header>
+
+<main class="admin-main">
+  <h1 class="admin-title">Relatórios</h1>
+
+  <div class="admin-card">
+    <div class="rel-filtros">
+      <div class="form-field"><label for="f-ano">Ano</label><select id="f-ano"></select></div>
+      <div class="form-field"><label for="f-mes">Mês</label>
+        <select id="f-mes">
+          <option value="">Ano inteiro</option>
+          <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
+          <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
+          <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
+          <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+      <p class="rel-nota" style="margin:0;" id="f-resumo"></p>
+    </div>
+  </div>
+
+  <div class="rel-tabs" id="rel-tabs">
+    <button type="button" class="rel-tab ativo" data-tab="consumo">Consumo de peças</button>
+    <button type="button" class="rel-tab" data-tab="abertos">Chamados abertos</button>
+    <button type="button" class="rel-tab" data-tab="backlog">Backlog</button>
+    <button type="button" class="rel-tab" data-tab="manutencao">Manutenção por defeito / peças</button>
+  </div>
+
+  <div id="painel"></div>
+</main>
+
+<div id="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="js/admin-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/planilha.js"></script>
+<script src="js/relatorios.js"></script>
+</body>
+</html>

@@ -31,7 +31,9 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
   A baixa no estoque é automática por gatilho (`private.ajustar_estoque_assistencia`, migration 0014): usar peça desconta, trocar reajusta, "não aprovado"/apagar devolve.
 - App mobile (PWA, só Assistência Técnica): `/app/` (`app/index.html`, `app.js`, `sw.js`, `manifest.webmanifest`). Para técnico e admin; mesmo Supabase/RLS;
   instalável na tela inicial (sem APK), exige internet (o service worker só guarda a casca). Login com o mesmo usuário/senha do sistema.
-- Menu (lateral): Dashboard, Vendas, Manutenção, Pós-venda, Assistência Técnica, Estoque, Clientes, Usuários. Estoque e Assistência Técnica não mudam.
+- Relatórios (só admin, `admin/relatorios.html`): consumo de peças, chamados abertos, backlog e manutenção por defeito/peças; filtro por ano e mês (data de abertura do chamado); exporta Excel.
+  Defeito é texto livre (agrupa descrições iguais); ideia futura: lista de tipos de defeito.
+- Menu (lateral): Dashboard, Vendas, Manutenção, Pós-venda, Assistência Técnica, Relatórios, Estoque, Clientes, Usuários. Estoque e Assistência Técnica não mudam.
 - Dashboard estilo BI (Chart.js) + "Tratado hoje"/"Pendente" por funil; clicar no nome abre a ficha (`admin/js/cliente-detalhe.js`).
 
 ## Pendências
