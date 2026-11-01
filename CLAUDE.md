@@ -36,8 +36,9 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
    logo e favicon em `assets/img/`. Se a Oficina tiver a logo branca oficial, trocar `logo-oficina-branca.png` (hoje gerada da logo do site).
 3. Domínio próprio da Oficina: hospedagem e verificar domínio no Resend; depois trocar `GERENTE_EMAIL` na edge function
    para `lucasbalancas@hotmail.com` e o remetente (hoje vai para `crm.oficinadasbalancas@gmail.com` via `onboarding@resend.dev`).
-4. Segurança por perfil no banco: hoje o perfil só esconde menu/páginas; as policies RLS são "authenticated full access".
-   Reescrever por role e testar cada tela com cada perfil, antes do uso real.
+4. (feito no banco — migration 0012) RLS por perfil via `private.meu_perfil()`: admin tudo; atendente = clientes/histórico (+ lê AT);
+   técnico = clientes/histórico + AT/equipamentos/estoque; profiles só admin (cada um edita o próprio sem mudar role); alertas_enviados só service_role.
+   Falta: testar cada tela logado com um usuário Técnico e um Atendente de verdade.
 5. Ligar a proteção contra senhas vazadas no Supabase Auth; avaliar Pro/keep-alive por causa da pausa do free tier.
 6. Decidir se status "Fechado" deve encerrar o lead (ganho/perdido) automaticamente.
 7. Testar as telas logado com dados reais (só foi testado com dados simulados).
