@@ -61,12 +61,12 @@
   <div class="admin-brand">CRP</div>
   <nav class="admin-nav">
     <a href="dashboard.html" class="active">Dashboard</a>
-    <a href="clientes.html" data-role="atendente">Clientes</a>
     <a href="vendas.html" data-role="atendente">Vendas</a>
     <a href="manutencao.html" data-role="tecnico">Manutenção</a>
     <a href="pos-venda.html" data-role="atendente">Pós-venda</a>
     <a href="assistencia-tecnica.html" data-role="tecnico">Assistência Técnica</a>
     <a href="estoque.html" data-role="tecnico">Estoque</a>
+    <a href="clientes.html" data-role="atendente">Clientes</a>
     <a href="usuarios.html" data-role="admin">Usuários</a>
   </nav>
   <div class="admin-user">
@@ -96,6 +96,20 @@
     <div class="bi-card"><h2>Leads por funil</h2><div class="bi-chart-box"><canvas id="chart-funil"></canvas></div></div>
   </div>
 
+  <div class="bi-section">Novo cliente</div>
+  <div class="bi-card">
+    <form class="dash-quick-form dash-novo" id="novo-form">
+      <select id="novo-funil" required></select>
+      <input type="text" id="novo-nome" placeholder="Nome *" required>
+      <input type="text" id="novo-telefone" placeholder="Telefone">
+      <input type="email" id="novo-email" placeholder="E-mail">
+      <select id="novo-canal"></select>
+      <button type="submit" class="btn btn-primary">Adicionar cliente</button>
+      <p id="novo-error" class="error-message" style="display:none; flex-basis:100%;"></p>
+    </form>
+    <p class="dash-empty" style="margin-top:6px;">Preencha o nome e pelo menos o telefone ou o e-mail.</p>
+  </div>
+
   <div class="bi-section">Operação do dia</div>
   <div class="dash-legenda">
     <span><i class="dot dot-verde"></i> Em dia</span>
@@ -107,17 +121,6 @@
     <div class="bi-card dash-quad" id="quad-venda" data-role="atendente">
       <div class="dash-quad-head">
         <h2>Vendas <span class="dash-count" id="quad-count-venda">—</span></h2>
-        <details class="dash-quick">
-          <summary>+ Novo em Vendas</summary>
-          <form class="dash-quick-form" id="quad-form-venda">
-            <input type="text" id="quad-nome-venda" placeholder="Nome *" required>
-            <input type="text" id="quad-telefone-venda" placeholder="Telefone">
-            <input type="email" id="quad-email-venda" placeholder="E-mail">
-            <select id="quad-canal-venda"></select>
-            <button type="submit" class="btn btn-primary">Adicionar</button>
-            <p id="quad-error-venda" class="error-message" style="display:none; flex-basis:100%;"></p>
-          </form>
-        </details>
         <a class="dash-link" href="vendas.html">Ver tudo em Vendas →</a>
       </div>
       <div class="dash-quad-cols">
@@ -135,17 +138,6 @@
     <div class="bi-card dash-quad" id="quad-manutencao" data-role="tecnico">
       <div class="dash-quad-head">
         <h2>Manutenção <span class="dash-count" id="quad-count-manutencao">—</span></h2>
-        <details class="dash-quick">
-          <summary>+ Novo em Manutenção</summary>
-          <form class="dash-quick-form" id="quad-form-manutencao">
-            <input type="text" id="quad-nome-manutencao" placeholder="Nome *" required>
-            <input type="text" id="quad-telefone-manutencao" placeholder="Telefone">
-            <input type="email" id="quad-email-manutencao" placeholder="E-mail">
-            <select id="quad-canal-manutencao"></select>
-            <button type="submit" class="btn btn-primary">Adicionar</button>
-            <p id="quad-error-manutencao" class="error-message" style="display:none; flex-basis:100%;"></p>
-          </form>
-        </details>
         <a class="dash-link" href="manutencao.html">Ver tudo em Manutenção →</a>
       </div>
       <div class="dash-quad-cols">
@@ -163,17 +155,6 @@
     <div class="bi-card dash-quad" id="quad-pos_venda" data-role="atendente">
       <div class="dash-quad-head">
         <h2>Pós-venda / Follow-up <span class="dash-count" id="quad-count-pos_venda">—</span></h2>
-        <details class="dash-quick">
-          <summary>+ Novo em Pós-venda</summary>
-          <form class="dash-quick-form" id="quad-form-pos_venda">
-            <input type="text" id="quad-nome-pos_venda" placeholder="Nome *" required>
-            <input type="text" id="quad-telefone-pos_venda" placeholder="Telefone">
-            <input type="email" id="quad-email-pos_venda" placeholder="E-mail">
-            <select id="quad-canal-pos_venda"></select>
-            <button type="submit" class="btn btn-primary">Adicionar</button>
-            <p id="quad-error-pos_venda" class="error-message" style="display:none; flex-basis:100%;"></p>
-          </form>
-        </details>
         <a class="dash-link" href="pos-venda.html">Ver tudo em Pós-venda →</a>
       </div>
       <div class="dash-quad-cols">

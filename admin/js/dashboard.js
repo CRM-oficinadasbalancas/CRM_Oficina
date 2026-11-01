@@ -293,40 +293,43 @@ async function carregarQuadrante(quadrante) {
   ligarLinksCliente(listaEl);
 }
 
-function configurarFormRapido(quadrante) {
-  var form = document.getElementById('quad-form-' + quadrante.categoria);
-  document.getElementById('quad-canal-' + quadrante.categoria).innerHTML =
+function configurarFormNovoCliente(role) {
+  var permitidos = {
+    admin: ['venda', 'manutencao', 'pos_venda'],
+    atendente: ['venda', 'pos_venda'],
+    tecnico: ['manutencao']
+  }[role] || [];
+  var funilSel = document.getElementById('novo-funil');
+  funilSel.innerHTML = '<option value="">Funil *</option>' + QUADRANTES.filter(function (q) {
+    return permitidos.indexOf(q.categoria) !== -1;
+  }).map(function (q) { return '<option value="' + q.categoria + '">' + q.label + '</option>'; }).join('');
+  document.getElementById('novo-canal').innerHTML =
     '<option value="">Canal de aquisição</option>' + opcoesCanalHtml('').replace('<option value="">—</option>', '');
 
+  var form = document.getElementById('novo-form');
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
-    var errorEl = document.getElementById('quad-error-' + quadrante.categoria);
+    var errorEl = document.getElementById('novo-error');
     errorEl.style.display = 'none';
 
-    var nome = document.getElementById('quad-nome-' + quadrante.categoria).value.trim();
-    var telefone = document.getElementById('quad-telefone-' + quadrante.categoria).value.trim();
-    var email = document.getElementById('quad-email-' + quadrante.categoria).value.trim();
+    var funil = funilSel.value;
+    var nome = document.getElementById('novo-nome').value.trim();
+    var telefone = document.getElementById('novo-telefone').value.trim();
+    var email = document.getElementById('novo-email').value.trim();
 
-    if (!nome) {
-      errorEl.textContent = 'Nome é obrigatório.';
-      errorEl.style.display = 'block';
-      return;
-    }
-    if (!telefone && !email) {
-      errorEl.textContent = 'Telefone ou e-mail obrigatório.';
-      errorEl.style.display = 'block';
-      return;
-    }
+    var msg = null;
+    if (!funil) msg = 'Escolha o funil.';
+    else if (!nome) msg = 'Nome é obrigatório.';
+    else if (!telefone && !email) msg = 'Telefone ou e-mail obrigatório.';
+    if (msg) { errorEl.textContent = msg; errorEl.style.display = 'block'; return; }
 
     var btn = form.querySelector('button[type="submit"]');
     btn.disabled = true;
-
     var { error } = await supabaseClient.from('clientes').insert({
       razao_social: nome, telefone_empresa: telefone || null, email_empresa: email || null,
-      canal_aquisicao: document.getElementById('quad-canal-' + quadrante.categoria).value || null,
-      categoria: quadrante.categoria, created_by: currentUserId
+      canal_aquisicao: document.getElementById('novo-canal').value || null,
+      categoria: funil, created_by: currentUserId
     });
-
     btn.disabled = false;
 
     if (error) {
@@ -334,9 +337,8 @@ function configurarFormRapido(quadrante) {
       errorEl.style.display = 'block';
       return;
     }
-
     form.reset();
-    showToast('Contato adicionado em ' + quadrante.label + '.', 'ok');
+    showToast('Cliente adicionado em ' + CATEGORIA_LABELS_DASH[funil] + '.', 'ok');
     recarregarTudo();
   });
 }
@@ -356,6 +358,6 @@ function recarregarTudo() {
   quadrantesVisiveis = QUADRANTES.filter(function (q) {
     return !!document.getElementById('quad-' + q.categoria);
   });
-  quadrantesVisiveis.forEach(configurarFormRapido);
+  configurarFormNovoCliente(auth.profile.role);
   recarregarTudo();
 })();

@@ -64,7 +64,8 @@ function renderPipelineTable() {
     var contato = [c.telefone_empresa, c.email_empresa].filter(Boolean).join(' — ') || '—';
     var prazo = formatarPrazo(item.retorno);
     var badgePrazo = prazo.classe ? '<span class="badge ' + prazo.classe + '">' + prazo.texto + '</span>' : prazo.texto;
-    return '<tr>' +
+    var classeLinha = (c.situacao === 'ativo' && !item.retorno.concluido) ? ' class="row-' + classificarUrgencia(item.retorno) + '"' : '';
+    return '<tr' + classeLinha + '>' +
       '<td><button type="button" class="link-cliente" data-abrir="' + c.id + '">' + escHtml(c.razao_social || '') + '</button></td>' +
       '<td>' + contato + '</td>' +
       '<td>' + (c.canal_aquisicao || '—') + '</td>' +
