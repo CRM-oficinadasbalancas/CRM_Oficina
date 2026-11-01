@@ -9,7 +9,7 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
   (se der 403 "denied to <outra conta>", é credencial salva no Gerenciador de Credenciais do Windows).
 - Supabase: projeto `gbahaegarnzgebgzeumk` ("CRM-oficinadasbalancas's Project"). Plano free: pausa por inatividade (usar `restore_project`).
 - Vercel: `crm-oficinabalanca.vercel.app` (homologação).
-- Migrations em `supabase/migrations/0001..0009`; edge function `supabase/functions/alertas-followup` (cron a cada 30 min via pg_cron).
+- Migrations em `supabase/migrations/0001..0011`; edge function `supabase/functions/alertas-followup` (cron a cada 30 min via pg_cron).
 
 ## Regras de trabalho
 - Claude NUNCA digita senhas, chaves de API nem tokens (RESEND_API_KEY, service_role etc.): o usuário roda/define.
@@ -25,12 +25,15 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
 - Cadência (`admin/js/prazos.js`, com port fiel em TS na edge function): Vendas 24/72/120h; Manutenção 60 dias após fechar,
   ou cadência de Vendas se não fechou; Pós-venda 30 dias (+30 se negativo). Lead ganho/perdido = concluído.
 - Alertas por e-mail ao gerente: 12 horas úteis de atraso (seg–sex 8–18, almoço 13–14) e 3 negativas seguidas.
-- Menu: Dashboard, Clientes, Vendas, Manutenção, Pós-venda, Assistência Técnica, Estoque, Usuários. Estoque e Assistência Técnica não mudam.
+- Leads (funis) não se misturam com a Assistência Técnica: `clientes.eh_cliente` (false = lead; true = cliente da Oficina, aparece na AT).
+  Migrar lead para a AT = marcar Tipo "Cliente da Oficina" na ficha (a ficha oferece ao marcar Ganho). AT/estoque começam zerados.
+- Menu (lateral): Dashboard, Vendas, Manutenção, Pós-venda, Assistência Técnica, Estoque, Clientes, Usuários. Estoque e Assistência Técnica não mudam.
 - Dashboard estilo BI (Chart.js) + "Tratado hoje"/"Pendente" por funil; clicar no nome abre a ficha (`admin/js/cliente-detalhe.js`).
 
 ## Pendências
-1. Push dos commits `8902d37` (canal/situação) e `d0db8e9` (dashboard BI + ficha) — travado por credencial do GitHub.
-2. Logo e cores oficiais (login e cabeçalho; hoje ainda aparece "CRP").
+1. (feito) Push funcionando: no repo há `credential.https://github.com.username=CRM-oficinadasbalancas`.
+2. (feito) Tema da Oficina: `admin/css/tema-oficina.css` (vermelho #D93035, preto #1B1B18, Instrument Sans), menu lateral preto,
+   logo e favicon em `assets/img/`. Se a Oficina tiver a logo branca oficial, trocar `logo-oficina-branca.png` (hoje gerada da logo do site).
 3. Domínio próprio da Oficina: hospedagem e verificar domínio no Resend; depois trocar `GERENTE_EMAIL` na edge function
    para `lucasbalancas@hotmail.com` e o remetente (hoje vai para `crm.oficinadasbalancas@gmail.com` via `onboarding@resend.dev`).
 4. Segurança por perfil no banco: hoje o perfil só esconde menu/páginas; as policies RLS são "authenticated full access".
