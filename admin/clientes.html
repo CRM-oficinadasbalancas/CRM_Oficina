@@ -220,28 +220,6 @@
   </div>
 </div>
 
-<!-- MODAL HISTÓRICO DE FOLLOW-UP -->
-<div class="modal-overlay no-print" id="modal-historico">
-  <div class="modal-box" style="max-width:720px;">
-    <h3>Histórico de follow-up — <span id="historico-cliente-nome"></span></h3>
-    <div class="form-field" style="margin-bottom:12px;">
-      <textarea id="historico-nova-anotacao" rows="2" placeholder="Registrar novo contato/anotação..."></textarea>
-    </div>
-    <div class="form-field" id="historico-resultado-wrapper" style="margin-bottom:12px; display:none;">
-      <label for="historico-resultado">Resultado deste contato</label>
-      <select id="historico-resultado"></select>
-    </div>
-    <div class="form-actions" style="margin-bottom:16px;">
-      <button type="button" class="btn btn-primary" id="historico-btn-adicionar">Adicionar</button>
-    </div>
-    <div id="historico-conteudo">Carregando...</div>
-    <div class="form-actions">
-      <button type="button" class="btn btn-outline" id="historico-btn-imprimir">Imprimir</button>
-      <button type="button" class="btn btn-outline" id="historico-btn-fechar">Fechar</button>
-    </div>
-  </div>
-</div>
-
 <!-- ÁREA DE IMPRESSÃO (histórico do cliente) -->
 <div class="print-sheet" id="print-sheet"></div>
 
@@ -277,6 +255,7 @@
 <script src="js/planilha.js"></script>
 <script src="js/historico.js"></script>
 <script src="js/prazos.js"></script>
+<script src="js/cliente-detalhe.js"></script>
 <script>
   document.getElementById('canal_aquisicao').innerHTML = opcoesCanalHtml('');
   document.getElementById('situacao').innerHTML = opcoesSituacaoHtml('ativo');

@@ -8,7 +8,6 @@ var CATEGORIA_LABELS_PIPELINE = { venda: 'Venda', manutencao: 'Manutenção', po
 var currentUserId = null;
 var pipelineClientes = [];
 var pipelineHistoricoPorCliente = {};
-var clienteEmHistorico = null;
 
 async function loadPipeline() {
   var { data, error } = await supabaseClient
@@ -66,7 +65,7 @@ function renderPipelineTable() {
     var prazo = formatarPrazo(item.retorno);
     var badgePrazo = prazo.classe ? '<span class="badge ' + prazo.classe + '">' + prazo.texto + '</span>' : prazo.texto;
     return '<tr>' +
-      '<td>' + (c.razao_social || '') + '</td>' +
+      '<td><button type="button" class="link-cliente" data-abrir="' + c.id + '">' + escHtml(c.razao_social || '') + '</button></td>' +
       '<td>' + contato + '</td>' +
       '<td>' + (c.canal_aquisicao || '—') + '</td>' +
       '<td>' + badgePrazo + '</td>' +
@@ -75,18 +74,15 @@ function renderPipelineTable() {
         'value="' + PIPELINE_CATEGORIA + '"', 'value="' + PIPELINE_CATEGORIA + '" selected'
       ) + '</select></td>' +
       '<td class="row-actions">' +
-        '<button data-historico="' + c.id + '">Histórico</button>' +
-        '<a href="clientes.html?editar=' + c.id + '" class="btn btn-outline" style="padding:6px 10px; font-size:0.8rem;">Editar cadastro</a>' +
+        '<button data-abrir="' + c.id + '">Abrir</button>' +
         '<button data-remover="' + c.id + '">Remover do funil</button>' +
       '</td>' +
     '</tr>';
   }).join('');
 
-  tbody.querySelectorAll('[data-historico]').forEach(function (btn) {
+  tbody.querySelectorAll('[data-abrir]').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var cliente = pipelineClientes.find(function (c) { return c.id === btn.dataset.historico; });
-      if (!cliente) return;
-      abrirHistoricoFollowup(cliente);
+      abrirClienteDetalhe(btn.dataset.abrir, { onChange: loadPipeline });
     });
   });
 
@@ -129,57 +125,6 @@ function renderPipelineTable() {
     });
   });
 }
-
-function configurarSeletorResultado() {
-  var wrapper = document.getElementById('historico-resultado-wrapper');
-  var select = document.getElementById('historico-resultado');
-  var labels = RESULTADO_LABELS_POR_CATEGORIA[PIPELINE_CATEGORIA];
-  if (!labels) {
-    wrapper.style.display = 'none';
-    return;
-  }
-  wrapper.style.display = 'block';
-  select.innerHTML =
-    '<option value="">Sem resultado ainda</option>' +
-    '<option value="positivo">' + labels.positivo + '</option>' +
-    '<option value="negativo">' + labels.negativo + '</option>';
-}
-
-function abrirHistoricoFollowup(cliente) {
-  clienteEmHistorico = cliente;
-  document.getElementById('historico-cliente-nome').textContent = cliente.razao_social;
-  document.getElementById('historico-nova-anotacao').value = '';
-  configurarSeletorResultado();
-  document.getElementById('modal-historico').classList.add('open');
-  loadHistoricoContatos(cliente.id, 'historico-conteudo');
-}
-
-document.getElementById('historico-btn-adicionar').addEventListener('click', async function () {
-  if (!clienteEmHistorico) return;
-  var textarea = document.getElementById('historico-nova-anotacao');
-  var anotacao = textarea.value.trim();
-  if (!anotacao) return;
-
-  var resultadoSelect = document.getElementById('historico-resultado');
-  var resultado = (RESULTADO_LABELS_POR_CATEGORIA[PIPELINE_CATEGORIA] && resultadoSelect.value) || null;
-
-  var btn = this;
-  btn.disabled = true;
-  var { error } = await salvarHistoricoContato(clienteEmHistorico.id, anotacao, currentUserId, resultado);
-  btn.disabled = false;
-
-  if (error) {
-    showToast('Erro ao salvar anotação: ' + error.message, 'error');
-    return;
-  }
-  textarea.value = '';
-  loadHistoricoContatos(clienteEmHistorico.id, 'historico-conteudo');
-  loadPipeline();
-});
-
-document.getElementById('historico-btn-fechar').addEventListener('click', function () {
-  document.getElementById('modal-historico').classList.remove('open');
-});
 
 /* ===================== NOVO CONTATO RÁPIDO ===================== */
 

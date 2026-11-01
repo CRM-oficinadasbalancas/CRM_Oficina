@@ -562,3 +562,7 @@ body.admin-body {
   border-bottom: 1px solid #ccc;
   padding-bottom: 3px;
 }
+
+.badge-info { background: #dfeeff; color: #0b57b0; }
+.link-cliente { color: var(--navy-900); font-weight: 600; cursor: pointer; background: none; border: 0; padding: 0; font: inherit; text-align: left; }
+.link-cliente:hover { color: var(--blue-accent); text-decoration: underline; }

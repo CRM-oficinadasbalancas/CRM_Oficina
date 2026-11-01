@@ -83,27 +83,6 @@
   </div>
 </main>
 
-<!-- MODAL HISTÓRICO DE FOLLOW-UP -->
-<div class="modal-overlay" id="modal-historico">
-  <div class="modal-box" style="max-width:720px;">
-    <h3>Histórico de follow-up — <span id="historico-cliente-nome"></span></h3>
-    <div class="form-field" style="margin-bottom:12px;">
-      <textarea id="historico-nova-anotacao" rows="2" placeholder="Registrar novo contato/anotação..."></textarea>
-    </div>
-    <div class="form-field" id="historico-resultado-wrapper" style="margin-bottom:12px; display:none;">
-      <label for="historico-resultado">Resultado deste contato</label>
-      <select id="historico-resultado"></select>
-    </div>
-    <div class="form-actions" style="margin-bottom:16px;">
-      <button type="button" class="btn btn-primary" id="historico-btn-adicionar">Adicionar</button>
-    </div>
-    <div id="historico-conteudo">Carregando...</div>
-    <div class="form-actions">
-      <button type="button" class="btn btn-outline" id="historico-btn-fechar">Fechar</button>
-    </div>
-  </div>
-</div>
-
 <div id="toast-container"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -113,6 +92,7 @@
 <script src="js/toast.js"></script>
 <script src="js/historico.js"></script>
 <script src="js/prazos.js"></script>
+<script src="js/cliente-detalhe.js"></script>
 <script>
   var PIPELINE_CATEGORIA = 'venda';
   var PIPELINE_LABEL = 'Vendas';

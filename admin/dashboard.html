@@ -10,14 +10,37 @@
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="css/admin.css">
 <style>
-  .dash-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; }
-  .dash-quad h2 { display:flex; align-items:center; justify-content:space-between; margin-top:0; }
-  .dash-count { font-size:1.6rem; font-weight:800; color:var(--navy-900, #0d2340); }
-  .dash-quick-form { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
-  .dash-quick-form input { padding:8px 10px; border-radius:6px; border:1px solid #d7ddea; }
-  .dash-link { font-size:0.82rem; }
-  .dash-subtitle { display:flex; align-items:center; gap:8px; font-size:0.9rem; text-transform:uppercase; letter-spacing:0.03em; color:var(--gray-400); margin:18px 0 6px; }
-  .dash-count-sm { font-size:0.85rem; font-weight:700; color:var(--navy-900, #0d2340); background:var(--off-white); border-radius:10px; padding:1px 8px; }
+  :root {
+    --bi-ativo: #0073e6;
+    --bi-ganho: #00b39a;
+    --bi-perdido: #b4bfd0;
+    --bi-alerta: #f0a020;
+    --bi-ink: #0a2540;
+    --bi-muted: #8b95a7;
+  }
+  .bi-section { font-size:0.8rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--bi-muted); margin:28px 0 12px; }
+  .bi-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:16px; }
+  .bi-kpi { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 6px 22px rgba(10,37,64,0.07); border-top:4px solid var(--kpi-cor, var(--bi-ink)); }
+  .bi-kpi .bi-kpi-label { font-size:0.78rem; color:var(--bi-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+  .bi-kpi .bi-kpi-valor { font-size:2.1rem; font-weight:800; color:var(--bi-ink); line-height:1.15; margin-top:6px; }
+  .bi-kpi .bi-kpi-sub { font-size:0.78rem; color:var(--bi-muted); margin-top:2px; }
+  .bi-charts { display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:16px; }
+  .bi-card { background:#fff; border-radius:14px; padding:18px 20px 14px; box-shadow:0 6px 22px rgba(10,37,64,0.07); }
+  .bi-card h2 { font-size:0.95rem; color:var(--bi-ink); margin:0 0 12px; }
+  .bi-chart-box { position:relative; height:260px; }
+  .dash-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; }
+  .dash-quad h2 { display:flex; align-items:center; justify-content:space-between; margin:0 0 10px; }
+  .dash-count { font-size:1.4rem; font-weight:800; color:var(--bi-ink); }
+  .dash-quick { margin-bottom:6px; }
+  .dash-quick summary { cursor:pointer; font-size:0.85rem; font-weight:600; color:var(--blue-accent); margin-bottom:8px; }
+  .dash-quick-form { display:flex; flex-direction:column; gap:8px; margin:10px 0 14px; }
+  .dash-quick-form input, .dash-quick-form select { padding:8px 10px; border-radius:6px; border:1px solid #d7ddea; }
+  .dash-link { font-size:0.82rem; margin-top:10px; }
+  .dash-subtitle { display:flex; align-items:center; gap:8px; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--bi-muted); margin:16px 0 6px; }
+  .dash-count-sm { font-size:0.8rem; font-weight:700; color:var(--bi-ink); background:var(--off-white); border-radius:10px; padding:1px 8px; }
+  .dash-item { padding:8px 0; border-bottom:1px solid var(--off-white); font-size:0.9rem; }
+  #quad-tratado-venda, #quad-tratado-manutencao, #quad-tratado-pos_venda, #quad-lista-venda, #quad-lista-manutencao, #quad-lista-pos_venda { max-height:300px; overflow-y:auto; }
+  .dash-empty { color:var(--bi-muted); font-size:0.85rem; }
 </style>
 </head>
 <body class="admin-body">
@@ -44,58 +67,88 @@
 <main class="admin-main">
   <h1 class="admin-title">Dashboard</h1>
 
+  <div class="bi-kpis">
+    <div class="bi-kpi" style="--kpi-cor:var(--bi-ativo);"><div class="bi-kpi-label">Leads ativos</div><div class="bi-kpi-valor" id="kpi-ativos">—</div><div class="bi-kpi-sub" id="kpi-ativos-sub">em andamento</div></div>
+    <div class="bi-kpi" style="--kpi-cor:var(--bi-ganho);"><div class="bi-kpi-label">Tratados hoje</div><div class="bi-kpi-valor" id="kpi-tratados">—</div><div class="bi-kpi-sub" id="kpi-tratados-sub">contatos registrados</div></div>
+    <div class="bi-kpi" style="--kpi-cor:var(--bi-alerta);"><div class="bi-kpi-label">Pendentes</div><div class="bi-kpi-valor" id="kpi-pendentes">—</div><div class="bi-kpi-sub" id="kpi-pendentes-sub">precisam de retorno</div></div>
+    <div class="bi-kpi" style="--kpi-cor:var(--bi-ganho);"><div class="bi-kpi-label">Ganhos</div><div class="bi-kpi-valor" id="kpi-ganhos">—</div><div class="bi-kpi-sub" id="kpi-ganhos-sub"></div></div>
+    <div class="bi-kpi" style="--kpi-cor:var(--bi-perdido);"><div class="bi-kpi-label">Perdidos</div><div class="bi-kpi-valor" id="kpi-perdidos">—</div><div class="bi-kpi-sub" id="kpi-perdidos-sub"></div></div>
+    <div class="bi-kpi" style="--kpi-cor:var(--bi-ink);"><div class="bi-kpi-label">Conversão</div><div class="bi-kpi-valor" id="kpi-conversao">—</div><div class="bi-kpi-sub" id="kpi-conversao-sub">ganhos ÷ encerrados</div></div>
+  </div>
+
+  <div class="bi-section">Visão geral</div>
+  <div class="bi-charts">
+    <div class="bi-card"><h2>Situação dos leads</h2><div class="bi-chart-box"><canvas id="chart-situacao"></canvas></div></div>
+    <div class="bi-card"><h2>Leads por canal de aquisição</h2><div class="bi-chart-box"><canvas id="chart-canal"></canvas></div></div>
+    <div class="bi-card"><h2>Leads por mês</h2><div class="bi-chart-box"><canvas id="chart-mes"></canvas></div></div>
+    <div class="bi-card"><h2>Leads por funil</h2><div class="bi-chart-box"><canvas id="chart-funil"></canvas></div></div>
+  </div>
+
+  <div class="bi-section">Operação do dia</div>
   <div class="dash-grid">
 
-    <div class="admin-card dash-quad" id="quad-venda" data-role="atendente">
+    <div class="bi-card dash-quad" id="quad-venda" data-role="atendente">
       <h2>Vendas <span class="dash-count" id="quad-count-venda">—</span></h2>
-      <form class="dash-quick-form" id="quad-form-venda">
-        <input type="text" id="quad-nome-venda" placeholder="Nome *" required>
-        <input type="text" id="quad-telefone-venda" placeholder="Telefone">
-        <input type="email" id="quad-email-venda" placeholder="E-mail">
-        <p id="quad-error-venda" class="error-message" style="display:none;"></p>
-        <button type="submit" class="btn btn-primary">+ Novo em Vendas</button>
-      </form>
+      <details class="dash-quick">
+        <summary>+ Novo em Vendas</summary>
+        <form class="dash-quick-form" id="quad-form-venda">
+          <input type="text" id="quad-nome-venda" placeholder="Nome *" required>
+          <input type="text" id="quad-telefone-venda" placeholder="Telefone">
+          <input type="email" id="quad-email-venda" placeholder="E-mail">
+          <select id="quad-canal-venda"></select>
+          <p id="quad-error-venda" class="error-message" style="display:none;"></p>
+          <button type="submit" class="btn btn-primary">Adicionar</button>
+        </form>
+      </details>
 
       <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-venda">—</span></h3>
       <div id="quad-tratado-venda">Carregando...</div>
 
-      <h3 class="dash-subtitle">Pendente</h3>
+      <h3 class="dash-subtitle">Pendente <span class="dash-count-sm" id="quad-count-pendente-venda">—</span></h3>
       <div id="quad-lista-venda">Carregando...</div>
       <p class="dash-link"><a href="vendas.html">Ver tudo em Vendas →</a></p>
     </div>
 
-    <div class="admin-card dash-quad" id="quad-manutencao" data-role="tecnico">
+    <div class="bi-card dash-quad" id="quad-manutencao" data-role="tecnico">
       <h2>Manutenção <span class="dash-count" id="quad-count-manutencao">—</span></h2>
-      <form class="dash-quick-form" id="quad-form-manutencao">
-        <input type="text" id="quad-nome-manutencao" placeholder="Nome *" required>
-        <input type="text" id="quad-telefone-manutencao" placeholder="Telefone">
-        <input type="email" id="quad-email-manutencao" placeholder="E-mail">
-        <p id="quad-error-manutencao" class="error-message" style="display:none;"></p>
-        <button type="submit" class="btn btn-primary">+ Novo em Manutenção</button>
-      </form>
+      <details class="dash-quick">
+        <summary>+ Novo em Manutenção</summary>
+        <form class="dash-quick-form" id="quad-form-manutencao">
+          <input type="text" id="quad-nome-manutencao" placeholder="Nome *" required>
+          <input type="text" id="quad-telefone-manutencao" placeholder="Telefone">
+          <input type="email" id="quad-email-manutencao" placeholder="E-mail">
+          <select id="quad-canal-manutencao"></select>
+          <p id="quad-error-manutencao" class="error-message" style="display:none;"></p>
+          <button type="submit" class="btn btn-primary">Adicionar</button>
+        </form>
+      </details>
 
       <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-manutencao">—</span></h3>
       <div id="quad-tratado-manutencao">Carregando...</div>
 
-      <h3 class="dash-subtitle">Pendente</h3>
+      <h3 class="dash-subtitle">Pendente <span class="dash-count-sm" id="quad-count-pendente-manutencao">—</span></h3>
       <div id="quad-lista-manutencao">Carregando...</div>
       <p class="dash-link"><a href="manutencao.html">Ver tudo em Manutenção →</a></p>
     </div>
 
-    <div class="admin-card dash-quad" id="quad-pos_venda" data-role="atendente">
+    <div class="bi-card dash-quad" id="quad-pos_venda" data-role="atendente">
       <h2>Pós-venda / Follow-up <span class="dash-count" id="quad-count-pos_venda">—</span></h2>
-      <form class="dash-quick-form" id="quad-form-pos_venda">
-        <input type="text" id="quad-nome-pos_venda" placeholder="Nome *" required>
-        <input type="text" id="quad-telefone-pos_venda" placeholder="Telefone">
-        <input type="email" id="quad-email-pos_venda" placeholder="E-mail">
-        <p id="quad-error-pos_venda" class="error-message" style="display:none;"></p>
-        <button type="submit" class="btn btn-primary">+ Novo em Pós-venda</button>
-      </form>
+      <details class="dash-quick">
+        <summary>+ Novo em Pós-venda</summary>
+        <form class="dash-quick-form" id="quad-form-pos_venda">
+          <input type="text" id="quad-nome-pos_venda" placeholder="Nome *" required>
+          <input type="text" id="quad-telefone-pos_venda" placeholder="Telefone">
+          <input type="email" id="quad-email-pos_venda" placeholder="E-mail">
+          <select id="quad-canal-pos_venda"></select>
+          <p id="quad-error-pos_venda" class="error-message" style="display:none;"></p>
+          <button type="submit" class="btn btn-primary">Adicionar</button>
+        </form>
+      </details>
 
       <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-pos_venda">—</span></h3>
       <div id="quad-tratado-pos_venda">Carregando...</div>
 
-      <h3 class="dash-subtitle">Pendente</h3>
+      <h3 class="dash-subtitle">Pendente <span class="dash-count-sm" id="quad-count-pendente-pos_venda">—</span></h3>
       <div id="quad-lista-pos_venda">Carregando...</div>
       <p class="dash-link"><a href="pos-venda.html">Ver tudo em Pós-venda →</a></p>
     </div>
@@ -106,11 +159,13 @@
 <div id="toast-container"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="js/admin-config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
 <script src="js/toast.js"></script>
 <script src="js/prazos.js"></script>
+<script src="js/cliente-detalhe.js"></script>
 <script src="js/dashboard.js"></script>
 </body>
 </html>

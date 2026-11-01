@@ -102,14 +102,14 @@ function renderClientesTable(list) {
       prazoTexto = prazo.classe ? '<span class="badge ' + prazo.classe + '">' + prazo.texto + '</span>' : prazo.texto;
     }
     return '<tr>' +
-      '<td>' + (c.razao_social || '') + badgeDuplicado + '</td>' +
+      '<td><button type="button" class="link-cliente" data-abrir="' + c.id + '">' + escHtml(c.razao_social || '') + '</button>' + badgeDuplicado + '</td>' +
       '<td>' + categoria + '</td>' +
       '<td>' + canal + '</td>' +
       '<td>' + prazoTexto + '</td>' +
       '<td>' + contato + '</td>' +
       '<td>' + (c.cnpj_cpf || '—') + '</td>' +
       '<td class="row-actions">' +
-        '<button data-historico="' + c.id + '">Histórico</button>' +
+        '<button data-abrir="' + c.id + '">Abrir</button>' +
         '<button data-historico-assistencia="' + c.id + '">Assist. Técnica</button>' +
         '<button data-edit="' + c.id + '">Editar</button>' +
         '<button data-delete="' + c.id + '" class="danger">Excluir</button>' +
@@ -117,11 +117,9 @@ function renderClientesTable(list) {
     '</tr>';
   }).join('');
 
-  tbody.querySelectorAll('[data-historico]').forEach(function (btn) {
+  tbody.querySelectorAll('[data-abrir]').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var cliente = allClientes.find(function (c) { return c.id === btn.dataset.historico; });
-      if (!cliente) return;
-      abrirHistoricoFollowup(cliente);
+      abrirClienteDetalhe(btn.dataset.abrir, { onChange: loadClientes });
     });
   });
 
@@ -162,54 +160,6 @@ function renderClientesTable(list) {
 
 /* ===================== HISTÓRICO DE FOLLOW-UP ===================== */
 
-var clienteEmHistorico = null;
-
-function configurarSeletorResultado(categoria) {
-  var wrapper = document.getElementById('historico-resultado-wrapper');
-  var select = document.getElementById('historico-resultado');
-  var labels = RESULTADO_LABELS_POR_CATEGORIA[categoria];
-  if (!labels) {
-    wrapper.style.display = 'none';
-    return;
-  }
-  wrapper.style.display = 'block';
-  select.innerHTML =
-    '<option value="">Sem resultado ainda</option>' +
-    '<option value="positivo">' + labels.positivo + '</option>' +
-    '<option value="negativo">' + labels.negativo + '</option>';
-}
-
-function abrirHistoricoFollowup(cliente) {
-  clienteEmHistorico = cliente;
-  document.getElementById('historico-cliente-nome').textContent = cliente.razao_social;
-  document.getElementById('historico-nova-anotacao').value = '';
-  configurarSeletorResultado(cliente.categoria);
-  document.getElementById('modal-historico').classList.add('open');
-  loadHistoricoContatos(cliente.id, 'historico-conteudo');
-}
-
-document.getElementById('historico-btn-adicionar').addEventListener('click', async function () {
-  if (!clienteEmHistorico) return;
-  var textarea = document.getElementById('historico-nova-anotacao');
-  var anotacao = textarea.value.trim();
-  if (!anotacao) return;
-
-  var resultadoSelect = document.getElementById('historico-resultado');
-  var resultado = (RESULTADO_LABELS_POR_CATEGORIA[clienteEmHistorico.categoria] && resultadoSelect.value) || null;
-
-  var btn = this;
-  btn.disabled = true;
-  var { error } = await salvarHistoricoContato(clienteEmHistorico.id, anotacao, currentUserId, resultado);
-  btn.disabled = false;
-
-  if (error) {
-    showToast('Erro ao salvar anotação: ' + error.message, 'error');
-    return;
-  }
-  textarea.value = '';
-  loadHistoricoContatos(clienteEmHistorico.id, 'historico-conteudo');
-  loadClientes();
-});
 
 document.getElementById('cliente-search').addEventListener('input', function (e) {
   var term = e.target.value.toLowerCase();
@@ -328,11 +278,6 @@ document.getElementById('cliente-cancel-btn').addEventListener('click', resetFor
   }
 })();
 
-var historicoBtnFechar = document.getElementById('historico-btn-fechar');
-if (historicoBtnFechar) historicoBtnFechar.addEventListener('click', function () {
-  document.getElementById('modal-historico').classList.remove('open');
-});
-
 var historicoAssistenciaBtnFechar = document.getElementById('historico-assistencia-btn-fechar');
 if (historicoAssistenciaBtnFechar) historicoAssistenciaBtnFechar.addEventListener('click', function () {
   document.getElementById('modal-historico-assistencia').classList.remove('open');
@@ -356,12 +301,6 @@ function imprimirHistorico(titulo, nomeCliente, conteudoId) {
   window.print();
   document.title = originalTitle;
 }
-
-var historicoBtnImprimir = document.getElementById('historico-btn-imprimir');
-if (historicoBtnImprimir) historicoBtnImprimir.addEventListener('click', function () {
-  var nomeCliente = document.getElementById('historico-cliente-nome').textContent;
-  imprimirHistorico('Histórico de Follow-up', nomeCliente, 'historico-conteudo');
-});
 
 var historicoAssistenciaBtnImprimir = document.getElementById('historico-assistencia-btn-imprimir');
 if (historicoAssistenciaBtnImprimir) historicoAssistenciaBtnImprimir.addEventListener('click', function () {
