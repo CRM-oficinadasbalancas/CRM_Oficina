@@ -247,8 +247,9 @@ async function carregarQuadrante(quadrante) {
       var badge = h.status
         ? '<span class="badge ' + STATUS_HISTORICO_BADGE[h.status] + '">' + STATUS_HISTORICO_LABELS[h.status] + '</span>'
         : '<span class="badge ' + (h.resultado === 'positivo' ? 'badge-ok' : (h.resultado === 'negativo' ? 'badge-danger' : 'badge-warning')) + '">' + labelResultado(quadrante.categoria, h.resultado) + '</span>';
-      return '<div class="dash-item">' + (cliente ? linkCliente(cliente) : '—') + ' ' + badge +
-        '<br><span style="font-size:0.78rem; color:var(--bi-muted);">' + horaStr + '</span></div>';
+      return '<div class="dash-row dash-row-verde">' +
+        '<span class="dash-row-nome">' + (cliente ? linkCliente(cliente) : '—') + '</span>' +
+        badge + '<span class="dash-row-meta">' + horaStr + '</span></div>';
     }).join('');
   }
   document.getElementById('quad-count-tratado-' + quadrante.categoria).textContent = tratadoHoje.length;
@@ -280,11 +281,14 @@ async function carregarQuadrante(quadrante) {
     listaEl.innerHTML = '<p class="dash-empty">Tudo em dia por aqui.</p>';
     return;
   }
-  listaEl.innerHTML = comPrazo.slice(0, 8).map(function (item) {
+  listaEl.innerHTML = comPrazo.map(function (item) {
     var prazo = formatarPrazo(item.retorno);
-    var badge = prazo.classe ? '<span class="badge ' + prazo.classe + '">' + prazo.texto + '</span>' : prazo.texto;
-    return '<div class="dash-item">' + linkCliente(item.cliente) + '<br>' +
-      '<span style="font-size:0.8rem;">' + badge + '</span></div>';
+    var c = item.cliente;
+    var meta = [c.telefone_empresa, c.canal_aquisicao].filter(Boolean).join(' · ');
+    return '<div class="dash-row dash-row-' + classificarUrgencia(item.retorno) + '">' +
+      '<span class="dash-row-nome">' + linkCliente(c) + '</span>' +
+      (meta ? '<span class="dash-row-meta">' + escHtml(meta) + '</span>' : '') +
+      '<span class="badge ' + (prazo.classe || '') + '">' + prazo.texto + '</span></div>';
   }).join('');
   ligarLinksCliente(listaEl);
 }

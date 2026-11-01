@@ -132,3 +132,15 @@ function opcoesSituacaoHtml(selecionada) {
     return '<option value="' + s + '"' + (s === selecionada ? ' selected' : '') + '>' + SITUACAO_LABELS[s] + '</option>';
   }).join('');
 }
+
+// Semáforo do prazo: 'vermelho' (atrasado / precisa de contato), 'amarelo'
+// (vence em até 24h) ou 'verde' (em dia). Mesmo corte do formatarPrazo.
+function classificarUrgencia(retorno) {
+  if (retorno.concluido) return 'verde';
+  if (retorno.prioridadeMaxima) return 'vermelho';
+  if (!retorno.data) return 'verde';
+  var diffMs = retorno.data.getTime() - Date.now();
+  if (diffMs < 0) return 'vermelho';
+  if (diffMs <= 24 * 60 * 60 * 1000) return 'amarelo';
+  return 'verde';
+}

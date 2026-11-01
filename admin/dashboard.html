@@ -28,19 +28,31 @@
   .bi-card { background:#fff; border-radius:14px; padding:18px 20px 14px; box-shadow:0 6px 22px rgba(10,37,64,0.07); }
   .bi-card h2 { font-size:0.95rem; color:var(--bi-ink); margin:0 0 12px; }
   .bi-chart-box { position:relative; height:260px; }
-  .dash-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; }
-  .dash-quad h2 { display:flex; align-items:center; justify-content:space-between; margin:0 0 10px; }
+  .dash-grid { display:flex; flex-direction:column; gap:16px; }
+  .dash-quad-head { display:flex; align-items:center; flex-wrap:wrap; gap:8px 24px; margin-bottom:6px; }
+  .dash-quad-head h2 { margin:0; display:flex; align-items:center; gap:10px; }
   .dash-count { font-size:1.4rem; font-weight:800; color:var(--bi-ink); }
-  .dash-quick { margin-bottom:6px; }
-  .dash-quick summary { cursor:pointer; font-size:0.85rem; font-weight:600; color:var(--blue-accent); margin-bottom:8px; }
-  .dash-quick-form { display:flex; flex-direction:column; gap:8px; margin:10px 0 14px; }
-  .dash-quick-form input, .dash-quick-form select { padding:8px 10px; border-radius:6px; border:1px solid #d7ddea; }
-  .dash-link { font-size:0.82rem; margin-top:10px; }
-  .dash-subtitle { display:flex; align-items:center; gap:8px; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--bi-muted); margin:16px 0 6px; }
+  .dash-quad-cols { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  @media (max-width: 900px) { .dash-quad-cols { grid-template-columns:1fr; } }
+  .dash-quick summary { cursor:pointer; font-size:0.85rem; font-weight:600; color:var(--blue-accent); }
+  .dash-quick[open] { flex-basis:100%; order:3; }
+  .dash-quick-form { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 6px; }
+  .dash-quick-form input, .dash-quick-form select { padding:8px 10px; border-radius:6px; border:1px solid #d7ddea; flex:1 1 160px; }
+  .dash-link { font-size:0.82rem; margin-left:auto; }
+  .dash-subtitle { display:flex; align-items:center; gap:8px; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--bi-muted); margin:12px 0 8px; }
   .dash-count-sm { font-size:0.8rem; font-weight:700; color:var(--bi-ink); background:var(--off-white); border-radius:10px; padding:1px 8px; }
-  .dash-item { padding:8px 0; border-bottom:1px solid var(--off-white); font-size:0.9rem; }
-  #quad-tratado-venda, #quad-tratado-manutencao, #quad-tratado-pos_venda, #quad-lista-venda, #quad-lista-manutencao, #quad-lista-pos_venda { max-height:300px; overflow-y:auto; }
+  .dash-lista { max-height:340px; overflow-y:auto; padding-right:4px; }
   .dash-empty { color:var(--bi-muted); font-size:0.85rem; }
+  .dash-legenda { display:flex; flex-wrap:wrap; gap:8px 20px; font-size:0.8rem; color:var(--bi-muted); margin:-4px 0 14px; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; }
+  .dot-verde { background:#00b39a; } .dot-amarelo { background:#f0a020; } .dot-vermelho { background:#d94452; }
+  /* Linha inteira preenchida pela cor do prazo */
+  .dash-row { display:flex; align-items:center; flex-wrap:wrap; gap:4px 14px; padding:10px 14px; border-radius:8px; margin-bottom:6px; font-size:0.9rem; border-left:5px solid transparent; }
+  .dash-row .dash-row-nome { flex:1 1 180px; min-width:0; }
+  .dash-row .dash-row-meta { font-size:0.78rem; color:#4a5568; }
+  .dash-row-verde { background:#d7f7f0; border-left-color:#00b39a; }
+  .dash-row-amarelo { background:#fff3cd; border-left-color:#f0a020; }
+  .dash-row-vermelho { background:#fbe1e1; border-left-color:#d94452; }
 </style>
 </head>
 <body class="admin-body">
@@ -85,72 +97,95 @@
   </div>
 
   <div class="bi-section">Operação do dia</div>
+  <div class="dash-legenda">
+    <span><i class="dot dot-verde"></i> Em dia</span>
+    <span><i class="dot dot-amarelo"></i> Atenção (vence em até 24h)</span>
+    <span><i class="dot dot-vermelho"></i> Atrasado / precisa de contato</span>
+  </div>
   <div class="dash-grid">
 
     <div class="bi-card dash-quad" id="quad-venda" data-role="atendente">
-      <h2>Vendas <span class="dash-count" id="quad-count-venda">—</span></h2>
-      <details class="dash-quick">
-        <summary>+ Novo em Vendas</summary>
-        <form class="dash-quick-form" id="quad-form-venda">
-          <input type="text" id="quad-nome-venda" placeholder="Nome *" required>
-          <input type="text" id="quad-telefone-venda" placeholder="Telefone">
-          <input type="email" id="quad-email-venda" placeholder="E-mail">
-          <select id="quad-canal-venda"></select>
-          <p id="quad-error-venda" class="error-message" style="display:none;"></p>
-          <button type="submit" class="btn btn-primary">Adicionar</button>
-        </form>
-      </details>
-
-      <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-venda">—</span></h3>
-      <div id="quad-tratado-venda">Carregando...</div>
-
-      <h3 class="dash-subtitle">Pendente <span class="dash-count-sm" id="quad-count-pendente-venda">—</span></h3>
-      <div id="quad-lista-venda">Carregando...</div>
-      <p class="dash-link"><a href="vendas.html">Ver tudo em Vendas →</a></p>
+      <div class="dash-quad-head">
+        <h2>Vendas <span class="dash-count" id="quad-count-venda">—</span></h2>
+        <details class="dash-quick">
+          <summary>+ Novo em Vendas</summary>
+          <form class="dash-quick-form" id="quad-form-venda">
+            <input type="text" id="quad-nome-venda" placeholder="Nome *" required>
+            <input type="text" id="quad-telefone-venda" placeholder="Telefone">
+            <input type="email" id="quad-email-venda" placeholder="E-mail">
+            <select id="quad-canal-venda"></select>
+            <button type="submit" class="btn btn-primary">Adicionar</button>
+            <p id="quad-error-venda" class="error-message" style="display:none; flex-basis:100%;"></p>
+          </form>
+        </details>
+        <a class="dash-link" href="vendas.html">Ver tudo em Vendas →</a>
+      </div>
+      <div class="dash-quad-cols">
+        <div class="dash-col">
+          <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-venda">—</span></h3>
+          <div class="dash-lista" id="quad-tratado-venda">Carregando...</div>
+        </div>
+        <div class="dash-col">
+          <h3 class="dash-subtitle">Pendente <span class="dash-count-sm" id="quad-count-pendente-venda">—</span></h3>
+          <div class="dash-lista" id="quad-lista-venda">Carregando...</div>
+        </div>
+      </div>
     </div>
 
     <div class="bi-card dash-quad" id="quad-manutencao" data-role="tecnico">
-      <h2>Manutenção <span class="dash-count" id="quad-count-manutencao">—</span></h2>
-      <details class="dash-quick">
-        <summary>+ Novo em Manutenção</summary>
-        <form class="dash-quick-form" id="quad-form-manutencao">
-          <input type="text" id="quad-nome-manutencao" placeholder="Nome *" required>
-          <input type="text" id="quad-telefone-manutencao" placeholder="Telefone">
-          <input type="email" id="quad-email-manutencao" placeholder="E-mail">
-          <select id="quad-canal-manutencao"></select>
-          <p id="quad-error-manutencao" class="error-message" style="display:none;"></p>
-          <button type="submit" class="btn btn-primary">Adicionar</button>
-        </form>
-      </details>
-
-      <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-manutencao">—</span></h3>
-      <div id="quad-tratado-manutencao">Carregando...</div>
-
-      <h3 class="dash-subtitle">Pendente <span class="dash-count-sm" id="quad-count-pendente-manutencao">—</span></h3>
-      <div id="quad-lista-manutencao">Carregando...</div>
-      <p class="dash-link"><a href="manutencao.html">Ver tudo em Manutenção →</a></p>
+      <div class="dash-quad-head">
+        <h2>Manutenção <span class="dash-count" id="quad-count-manutencao">—</span></h2>
+        <details class="dash-quick">
+          <summary>+ Novo em Manutenção</summary>
+          <form class="dash-quick-form" id="quad-form-manutencao">
+            <input type="text" id="quad-nome-manutencao" placeholder="Nome *" required>
+            <input type="text" id="quad-telefone-manutencao" placeholder="Telefone">
+            <input type="email" id="quad-email-manutencao" placeholder="E-mail">
+            <select id="quad-canal-manutencao"></select>
+            <button type="submit" class="btn btn-primary">Adicionar</button>
+            <p id="quad-error-manutencao" class="error-message" style="display:none; flex-basis:100%;"></p>
+          </form>
+        </details>
+        <a class="dash-link" href="manutencao.html">Ver tudo em Manutenção →</a>
+      </div>
+      <div class="dash-quad-cols">
+        <div class="dash-col">
+          <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-manutencao">—</span></h3>
+          <div class="dash-lista" id="quad-tratado-manutencao">Carregando...</div>
+        </div>
+        <div class="dash-col">
+          <h3 class="dash-subtitle">Pendente <span class="dash-count-sm" id="quad-count-pendente-manutencao">—</span></h3>
+          <div class="dash-lista" id="quad-lista-manutencao">Carregando...</div>
+        </div>
+      </div>
     </div>
 
     <div class="bi-card dash-quad" id="quad-pos_venda" data-role="atendente">
-      <h2>Pós-venda / Follow-up <span class="dash-count" id="quad-count-pos_venda">—</span></h2>
-      <details class="dash-quick">
-        <summary>+ Novo em Pós-venda</summary>
-        <form class="dash-quick-form" id="quad-form-pos_venda">
-          <input type="text" id="quad-nome-pos_venda" placeholder="Nome *" required>
-          <input type="text" id="quad-telefone-pos_venda" placeholder="Telefone">
-          <input type="email" id="quad-email-pos_venda" placeholder="E-mail">
-          <select id="quad-canal-pos_venda"></select>
-          <p id="quad-error-pos_venda" class="error-message" style="display:none;"></p>
-          <button type="submit" class="btn btn-primary">Adicionar</button>
-        </form>
-      </details>
-
-      <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-pos_venda">—</span></h3>
-      <div id="quad-tratado-pos_venda">Carregando...</div>
-
-      <h3 class="dash-subtitle">Pendente <span class="dash-count-sm" id="quad-count-pendente-pos_venda">—</span></h3>
-      <div id="quad-lista-pos_venda">Carregando...</div>
-      <p class="dash-link"><a href="pos-venda.html">Ver tudo em Pós-venda →</a></p>
+      <div class="dash-quad-head">
+        <h2>Pós-venda / Follow-up <span class="dash-count" id="quad-count-pos_venda">—</span></h2>
+        <details class="dash-quick">
+          <summary>+ Novo em Pós-venda</summary>
+          <form class="dash-quick-form" id="quad-form-pos_venda">
+            <input type="text" id="quad-nome-pos_venda" placeholder="Nome *" required>
+            <input type="text" id="quad-telefone-pos_venda" placeholder="Telefone">
+            <input type="email" id="quad-email-pos_venda" placeholder="E-mail">
+            <select id="quad-canal-pos_venda"></select>
+            <button type="submit" class="btn btn-primary">Adicionar</button>
+            <p id="quad-error-pos_venda" class="error-message" style="display:none; flex-basis:100%;"></p>
+          </form>
+        </details>
+        <a class="dash-link" href="pos-venda.html">Ver tudo em Pós-venda →</a>
+      </div>
+      <div class="dash-quad-cols">
+        <div class="dash-col">
+          <h3 class="dash-subtitle">Tratado hoje <span class="dash-count-sm" id="quad-count-tratado-pos_venda">—</span></h3>
+          <div class="dash-lista" id="quad-tratado-pos_venda">Carregando...</div>
+        </div>
+        <div class="dash-col">
+          <h3 class="dash-subtitle">Pendente <span class="dash-count-sm" id="quad-count-pendente-pos_venda">—</span></h3>
+          <div class="dash-lista" id="quad-lista-pos_venda">Carregando...</div>
+        </div>
+      </div>
     </div>
 
   </div>
