@@ -332,27 +332,27 @@ $('form-chamado').addEventListener('submit', async function (e) {
   carregarChamados();
 });
 
-/* ===================== INSTALAR / SERVICE WORKER ===================== */
+/* ===================== CELULAR x COMPUTADOR ===================== */
 
-var eventoInstalar = null;
-window.addEventListener('beforeinstallprompt', function (e) {
-  e.preventDefault();
-  eventoInstalar = e;
-  $('btn-instalar').hidden = false;
-});
-$('btn-instalar').addEventListener('click', async function () {
-  if (!eventoInstalar) return;
-  eventoInstalar.prompt();
-  await eventoInstalar.userChoice;
-  eventoInstalar = null;
-  $('btn-instalar').hidden = true;
-});
-if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone) $('dica-ios').hidden = false;
+// Sem instalação: o mesmo endereço do sistema serve os dois. No computador esta tela
+// manda para o sistema completo; ?mobile=1 deixa abrir a tela de chamados no PC.
+function ehCelular() {
+  var ua = navigator.userAgent || '';
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+}
+if (/[?&]mobile=1/.test(location.search)) { try { sessionStorage.removeItem('crm_forcar_desktop'); } catch (e) {} }
 
+// Versão antiga do app instalável: tira o service worker e o cache, se existirem.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  navigator.serviceWorker.getRegistrations().then(function (regs) { regs.forEach(function (r) { r.unregister(); }); }).catch(function () {});
+  if (window.caches) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }).catch(function () {});
 }
 
 window.addEventListener('offline', function () { avisar('Sem internet — o app precisa de conexão para salvar.', 'erro'); });
 
-iniciar();
+if (!ehCelular() && !/[?&]mobile=1/.test(location.search)) {
+  location.replace('../admin/dashboard.html');
+} else {
+  iniciar();
+}

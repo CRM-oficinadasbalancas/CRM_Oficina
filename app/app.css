@@ -98,3 +98,5 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--vermelho); 
 .aviso { position: fixed; left: 14px; right: 14px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 100; background: var(--carvao); color: #fff; padding: 13px 16px; border-radius: 8px; font-weight: 600; text-align: center; }
 .aviso.erro-aviso { background: #a92323; }
 .aviso.ok { background: #1e6b3c; }
+
+.topo-link { color: #fff; font-size: 0.82rem; font-weight: 600; text-decoration: underline; margin-left: auto; margin-right: 10px; }

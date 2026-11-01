@@ -6,13 +6,8 @@
 <title>Chamados — Oficina das Balanças</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#000000">
-<link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Chamados">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
 </head>
@@ -31,9 +26,7 @@
       <p id="login-erro" class="erro" hidden></p>
       <button type="submit" class="btn btn-vermelho btn-bloco" id="login-btn">Entrar</button>
     </form>
-    <button type="button" class="btn-link" id="btn-instalar" hidden>Instalar o app no celular</button>
-    <p class="dica" id="dica-ios" hidden>No iPhone, abra pelo <strong>Safari</strong>: toque em <strong>Compartilhar</strong> e depois em <strong>Adicionar à Tela de Início</strong>.</p>
-    <p class="dica"><a href="instalar.html" style="color:var(--vermelho);">Como instalar no celular</a></p>
+    <p class="dica" style="text-align:center;"><a href="../admin/dashboard.html?desktop=1" style="color:var(--vermelho);">Abrir o sistema completo</a></p>
   </div>
 </section>
 
@@ -66,6 +59,7 @@
 <section id="view-lista" class="tela" hidden>
   <header class="topo">
     <img src="../assets/img/logo-oficina-branca.png" alt="Oficina das Balanças" class="topo-logo">
+    <a href="../admin/dashboard.html?desktop=1" class="topo-link">Sistema completo</a>
     <button type="button" class="topo-sair" data-sair>Sair</button>
   </header>
   <div class="barra-filtros">
