@@ -1,7 +1,7 @@
 // Service worker do app de chamados. Só guarda a "casca" do app (HTML/CSS/JS/ícones)
 // para abrir rápido e instalar na tela inicial. Os dados vêm sempre online do Supabase
 // (nunca são guardados aqui): sem internet o app avisa e não deixa salvar.
-var VERSAO = 'chamados-v1';
+var VERSAO = 'chamados-v2';
 var CASCA = [
   './',
   './index.html',
@@ -9,6 +9,8 @@ var CASCA = [
   './app.js',
   './manifest.webmanifest',
   './icon-192.png',
+  './apple-touch-icon.png',
+  './instalar.html',
   '../admin/js/admin-config.js',
   '../admin/js/supabase-client.js',
   '../assets/img/logo-oficina-branca.png'
