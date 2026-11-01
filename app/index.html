@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chamados — Oficina das Balanças</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Chamados">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ENTRAR -->
+<section id="view-login" class="tela tela-centro" hidden>
+  <div class="cartao-login">
+    <img src="../assets/img/logo-oficina.webp" alt="Oficina das Balanças" class="logo-login">
+    <h1>Chamados</h1>
+    <form id="form-login" autocomplete="on">
+      <label for="login-usuario">Usuário</label>
+      <input id="login-usuario" type="text" autocomplete="username" autocapitalize="none" required>
+      <label for="login-senha">Senha</label>
+      <input id="login-senha" type="password" autocomplete="current-password" required>
+      <p id="login-erro" class="erro" hidden></p>
+      <button type="submit" class="btn btn-vermelho btn-bloco" id="login-btn">Entrar</button>
+    </form>
+    <button type="button" class="btn-link" id="btn-instalar" hidden>Instalar o app no celular</button>
+    <p class="dica" id="dica-ios" hidden>No iPhone: toque em <strong>Compartilhar</strong> e depois em <strong>Adicionar à Tela de Início</strong>.</p>
+  </div>
+</section>
+
+<!-- TROCA DE SENHA (primeiro acesso) -->
+<section id="view-troca" class="tela tela-centro" hidden>
+  <div class="cartao-login">
+    <h1>Crie sua senha</h1>
+    <p class="dica">Por segurança, troque a senha temporária antes de continuar.</p>
+    <form id="form-troca">
+      <label for="troca-senha">Nova senha</label>
+      <input id="troca-senha" type="password" minlength="6" autocomplete="new-password" required>
+      <label for="troca-senha2">Repita a nova senha</label>
+      <input id="troca-senha2" type="password" minlength="6" autocomplete="new-password" required>
+      <p id="troca-erro" class="erro" hidden></p>
+      <button type="submit" class="btn btn-vermelho btn-bloco">Salvar senha</button>
+    </form>
+  </div>
+</section>
+
+<!-- SEM ACESSO -->
+<section id="view-sem-acesso" class="tela tela-centro" hidden>
+  <div class="cartao-login">
+    <h1>Sem acesso</h1>
+    <p class="dica">Este app é só para técnicos e administradores. Peça ao administrador para ajustar o seu perfil.</p>
+    <button type="button" class="btn btn-vermelho btn-bloco" data-sair>Sair</button>
+  </div>
+</section>
+
+<!-- LISTA DE CHAMADOS -->
+<section id="view-lista" class="tela" hidden>
+  <header class="topo">
+    <img src="../assets/img/logo-oficina-branca.png" alt="Oficina das Balanças" class="topo-logo">
+    <button type="button" class="topo-sair" data-sair>Sair</button>
+  </header>
+  <div class="barra-filtros">
+    <input id="busca" type="search" placeholder="Buscar por nº, cliente ou equipamento" inputmode="search">
+    <div class="chips" id="chips">
+      <button type="button" class="chip ativo" data-status="">Todos</button>
+      <button type="button" class="chip" data-status="aberta">Abertas</button>
+      <button type="button" class="chip" data-status="em_andamento">Em andamento</button>
+      <button type="button" class="chip" data-status="pendente">Pendentes</button>
+      <button type="button" class="chip" data-status="concluida">Concluídas</button>
+      <button type="button" class="chip" data-status="nao_aprovada">Não aprovadas</button>
+    </div>
+  </div>
+  <div id="lista" class="lista"></div>
+  <button type="button" class="fab" id="btn-novo">+ Novo chamado</button>
+</section>
+
+<!-- FORMULÁRIO DO CHAMADO -->
+<section id="view-form" class="tela" hidden>
+  <header class="topo">
+    <button type="button" class="topo-voltar" id="btn-voltar">‹ Voltar</button>
+    <strong id="form-titulo">Novo chamado</strong>
+    <span></span>
+  </header>
+  <form id="form-chamado" class="form">
+    <div id="bloco-cliente">
+      <label for="cli-busca">Cliente *</label>
+      <input id="cli-busca" type="search" placeholder="Digite para filtrar o cliente">
+      <select id="cli-select" size="1"></select>
+      <p class="dica" id="cli-dica">Só aparecem os clientes da Oficina. Cliente novo: peça ao administrador para cadastrar.</p>
+
+      <label for="eq-select">Equipamento *</label>
+      <select id="eq-select"></select>
+      <div id="eq-novo" class="caixa" hidden>
+        <label for="eq-marca">Marca</label><input id="eq-marca" type="text" maxlength="100" placeholder="Ex: Toledo">
+        <label for="eq-modelo">Modelo</label><input id="eq-modelo" type="text" maxlength="100" placeholder="Ex: 9091-B/15">
+        <label for="eq-serie">Nº de série *</label><input id="eq-serie" type="text" maxlength="20" placeholder="Letras e números, até 20" autocapitalize="characters">
+      </div>
+    </div>
+    <div id="bloco-cliente-fixo" class="caixa" hidden></div>
+
+    <label for="defeito">Defeito *</label>
+    <textarea id="defeito" rows="4" maxlength="5000" placeholder="O que o cliente relatou / o que você encontrou"></textarea>
+
+    <label for="status">Status</label>
+    <select id="status">
+      <option value="aberta">Aberta</option>
+      <option value="em_andamento">Em andamento</option>
+      <option value="pendente">Pendente (congela o prazo)</option>
+      <option value="concluida">Concluída</option>
+      <option value="nao_aprovada">Não aprovado pelo cliente</option>
+    </select>
+
+    <label for="resolucao">Resolução <span id="res-obrig" hidden>*</span></label>
+    <textarea id="resolucao" rows="3" maxlength="5000" placeholder="O que foi feito (obrigatório para concluir ou para não aprovado)"></textarea>
+
+    <div class="caixa" id="bloco-peca">
+      <label for="peca">Peça utilizada</label>
+      <select id="peca"></select>
+      <p class="dica" id="peca-info"></p>
+      <label for="peca-qtd">Quantidade usada</label>
+      <input id="peca-qtd" type="text" inputmode="decimal" maxlength="8" placeholder="Ex: 1">
+      <p class="dica">O estoque é descontado automaticamente ao salvar.</p>
+    </div>
+
+    <details class="caixa">
+      <summary>Selos e lacres (opcional)</summary>
+      <label for="selo-antigo">Selo antigo</label><input id="selo-antigo" type="text" maxlength="20">
+      <label for="selo-novo">Selo novo</label><input id="selo-novo" type="text" maxlength="20">
+      <label for="lacre-antigo">Lacre antigo</label><input id="lacre-antigo" type="text" maxlength="20">
+      <label for="lacre-novo">Lacre novo</label><input id="lacre-novo" type="text" maxlength="20">
+    </details>
+
+    <p id="form-erro" class="erro" hidden></p>
+    <button type="submit" class="btn btn-vermelho btn-bloco" id="btn-salvar">Salvar chamado</button>
+  </form>
+</section>
+
+<div id="aviso" class="aviso" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../admin/js/admin-config.js"></script>
+<script src="../admin/js/supabase-client.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

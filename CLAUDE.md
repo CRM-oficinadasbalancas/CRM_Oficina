@@ -29,6 +29,8 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
   Migrar lead para a AT = marcar Tipo "Cliente da Oficina" na ficha (a ficha oferece ao marcar Ganho). AT/estoque começam zerados.
 - Estoque: só o admin altera (e vê a tela). Técnico só alimenta chamados (assistências/equipamentos) e LÊ as peças; apagar chamado/equipamento = admin.
   A baixa no estoque é automática por gatilho (`private.ajustar_estoque_assistencia`, migration 0014): usar peça desconta, trocar reajusta, "não aprovado"/apagar devolve.
+- App mobile (PWA, só Assistência Técnica): `/app/` (`app/index.html`, `app.js`, `sw.js`, `manifest.webmanifest`). Para técnico e admin; mesmo Supabase/RLS;
+  instalável na tela inicial (sem APK), exige internet (o service worker só guarda a casca). Login com o mesmo usuário/senha do sistema.
 - Menu (lateral): Dashboard, Vendas, Manutenção, Pós-venda, Assistência Técnica, Estoque, Clientes, Usuários. Estoque e Assistência Técnica não mudam.
 - Dashboard estilo BI (Chart.js) + "Tratado hoje"/"Pendente" por funil; clicar no nome abre a ficha (`admin/js/cliente-detalhe.js`).
 

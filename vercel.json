@@ -1,5 +1,9 @@
 {
   "redirects": [
     { "source": "/", "destination": "/admin/login.html", "permanent": false }
+  ],
+  "headers": [
+    { "source": "/app/sw.js", "headers": [ { "key": "Cache-Control", "value": "no-cache" } ] },
+    { "source": "/app/manifest.webmanifest", "headers": [ { "key": "Content-Type", "value": "application/manifest+json" } ] }
   ]
 }
