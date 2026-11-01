@@ -102,7 +102,8 @@ body.admin-body { padding-left: var(--sidebar-w); }
 .btn-outline:hover { background: var(--oficina-preto); color: #fff; }
 
 /* ===== Login ===== */
-.login-shell { background: linear-gradient(160deg, #000 0%, var(--oficina-preto) 100%); }
+.login-page, body.admin-body.login-page { padding-left: 0; background: #000; }
+.login-shell { background: #000; min-height: 100vh; }
 .login-card { border-top: 4px solid var(--oficina-vermelho); border-radius: 6px; }
 .login-card .brand-mark { aspect-ratio: auto; width: auto; margin: 0 auto 24px; font-size: inherit; text-align: center; }
 .login-card .brand-mark img { display: block; margin: 0 auto; max-width: 260px; width: 100%; height: auto; }
