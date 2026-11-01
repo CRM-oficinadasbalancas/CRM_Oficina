@@ -36,7 +36,8 @@ window.ADMIN_AUTH_READY = (async function () {
   // perfil — tanto por URL direta quanto pelos links do menu.
   var PAGINAS_POR_ROLE = {
     tecnico: ['dashboard', 'assistencia-tecnica', 'estoque', 'manutencao'],
-    atendente: ['dashboard', 'clientes', 'vendas', 'pos-venda']
+    atendente: ['dashboard', 'clientes', 'vendas', 'pos-venda'],
+    vendedor: ['vendas', 'manutencao', 'pos-venda']
   };
   if (profile.role !== 'admin') {
     var paginasPermitidas = PAGINAS_POR_ROLE[profile.role] || [];
@@ -69,5 +70,6 @@ window.ADMIN_AUTH_READY = (async function () {
     });
   });
 
+  window.ADMIN_ROLE = profile.role;
   return { session: session, profile: profile };
 })();

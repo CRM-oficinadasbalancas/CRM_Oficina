@@ -136,7 +136,9 @@ async function abrirClienteDetalhe(clienteId, opcoes) {
   document.getElementById('det-situacao').innerHTML = opcoesSituacaoHtml(data.situacao || 'ativo');
   document.getElementById('det-tipo').value = String(!!data.eh_cliente);
   atualizarCamposDetalhePorTipo();
-  document.getElementById('det-cadastro').href = 'clientes.html?editar=' + data.id;
+  var linkCadastro = document.getElementById('det-cadastro');
+  linkCadastro.href = 'clientes.html?editar=' + data.id;
+  linkCadastro.style.display = window.ADMIN_ROLE === 'vendedor' ? 'none' : '';
   document.getElementById('det-erro').style.display = 'none';
   mostrarAddInfo(false);
 

@@ -133,7 +133,7 @@ function renderClientesTable(list) {
         '<button data-abrir="' + c.id + '">Abrir</button>' +
         (c.eh_cliente ? '<button data-historico-assistencia="' + c.id + '">Assist. Técnica</button>' : '') +
         '<button data-edit="' + c.id + '">Editar</button>' +
-        '<button data-delete="' + c.id + '" class="danger">Excluir</button>' +
+        (window.ADMIN_ROLE === 'admin' ? '<button data-delete="' + c.id + '" class="danger">Excluir</button>' : '') +
       '</td>' +
     '</tr>';
   }).join('');
