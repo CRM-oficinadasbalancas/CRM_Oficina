@@ -164,7 +164,7 @@ body.admin-body {
   border-radius: 999px;
 }
 .badge-warning { background: #fff3cd; color: #8a6100; }
-.badge-ok { background: #d7f7f0; color: #00786a; }
+.badge-ok { background: #dcf3e4; color: #00786a; }
 .badge-danger { background: #fbe1e1; color: #a92323; }
 
 .toast {
@@ -568,12 +568,12 @@ body.admin-body {
 .link-cliente:hover { color: var(--blue-accent); text-decoration: underline; }
 
 /* Linhas das tabelas dos funis preenchidas pela cor do prazo */
-.admin-table tr.row-verde > td { background: #d7f7f0; }
+.admin-table tr.row-verde > td { background: #dcf3e4; }
 .admin-table tr.row-amarelo > td { background: #fff3cd; }
 .admin-table tr.row-vermelho > td { background: #fbe1e1; }
-.admin-table tr.row-verde > td:first-child { box-shadow: inset 5px 0 0 #00b39a; }
+.admin-table tr.row-verde > td:first-child { box-shadow: inset 5px 0 0 #2e9e5b; }
 .admin-table tr.row-amarelo > td:first-child { box-shadow: inset 5px 0 0 #f0a020; }
 .admin-table tr.row-vermelho > td:first-child { box-shadow: inset 5px 0 0 #d94452; }
 .legenda-prazo { display:flex; flex-wrap:wrap; gap:8px 20px; font-size:0.8rem; color: var(--gray-400); margin: 0 0 12px; }
 .legenda-prazo .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; }
-.legenda-prazo .dot-verde { background:#00b39a; } .legenda-prazo .dot-amarelo { background:#f0a020; } .legenda-prazo .dot-vermelho { background:#d94452; }
+.legenda-prazo .dot-verde { background:#2e9e5b; } .legenda-prazo .dot-amarelo { background:#f0a020; } .legenda-prazo .dot-vermelho { background:#d94452; }

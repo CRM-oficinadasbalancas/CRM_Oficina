@@ -3,19 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard — CRP</title>
+<title>Dashboard — CRM Oficina das Balanças</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="../assets/img/logo-full.png" type="image/png">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" href="../assets/img/logo-oficina.webp" type="image/webp">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="css/tema-oficina.css">
 <style>
   :root {
-    --bi-ativo: #0073e6;
-    --bi-ganho: #00b39a;
-    --bi-perdido: #b4bfd0;
+    --bi-ativo: #3a3a36;
+    --bi-ganho: #2e9e5b;
+    --bi-perdido: #cfcfca;
     --bi-alerta: #f0a020;
-    --bi-ink: #0a2540;
+    --bi-ink: #1b1b18;
     --bi-muted: #8b95a7;
   }
   .bi-section { font-size:0.8rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--bi-muted); margin:28px 0 12px; }
@@ -45,12 +46,12 @@
   .dash-empty { color:var(--bi-muted); font-size:0.85rem; }
   .dash-legenda { display:flex; flex-wrap:wrap; gap:8px 20px; font-size:0.8rem; color:var(--bi-muted); margin:-4px 0 14px; }
   .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; }
-  .dot-verde { background:#00b39a; } .dot-amarelo { background:#f0a020; } .dot-vermelho { background:#d94452; }
+  .dot-verde { background:#2e9e5b; } .dot-amarelo { background:#f0a020; } .dot-vermelho { background:#d94452; }
   /* Linha inteira preenchida pela cor do prazo */
   .dash-row { display:flex; align-items:center; flex-wrap:wrap; gap:4px 14px; padding:10px 14px; border-radius:8px; margin-bottom:6px; font-size:0.9rem; border-left:5px solid transparent; }
   .dash-row .dash-row-nome { flex:1 1 180px; min-width:0; }
   .dash-row .dash-row-meta { font-size:0.78rem; color:#4a5568; }
-  .dash-row-verde { background:#d7f7f0; border-left-color:#00b39a; }
+  .dash-row-verde { background:#dcf3e4; border-left-color:#2e9e5b; }
   .dash-row-amarelo { background:#fff3cd; border-left-color:#f0a020; }
   .dash-row-vermelho { background:#fbe1e1; border-left-color:#d94452; }
 </style>
@@ -58,7 +59,7 @@
 <body class="admin-body">
 
 <header class="admin-header">
-  <div class="admin-brand">CRP</div>
+  <a href="dashboard.html" class="admin-brand"><img src="../assets/img/logo-oficina.webp" alt="Oficina das Balanças"></a>
   <nav class="admin-nav">
     <a href="dashboard.html" class="active">Dashboard</a>
     <a href="vendas.html" data-role="atendente">Vendas</a>

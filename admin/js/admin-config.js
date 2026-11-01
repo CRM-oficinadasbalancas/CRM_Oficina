@@ -11,7 +11,7 @@ var ADMIN_CONFIG = {
 // cliente novo, é só preencher aqui: nenhum outro arquivo tem esses dados
 // fixos no código.
 var EMPRESA_CONFIG = {
-  nome: 'CRP',
+  nome: 'Oficina das Balanças',
   cnpj: '',
   endereco: '',
   chavePix: ''
