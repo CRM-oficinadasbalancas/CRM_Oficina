@@ -21,20 +21,75 @@
 
 body, body.admin-body { font-family: var(--font-body); }
 
-/* ===== Cabeçalho: branco com logo e filete vermelho, como o site ===== */
+/* ===== Menu lateral esquerdo (o <header> vira a barra lateral) ===== */
+:root { --sidebar-w: 240px; }
+
+body.admin-body { padding-left: var(--sidebar-w); }
+
 .admin-header {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-w);
+  z-index: 300;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 18px;
+  padding: 22px 14px 18px;
   background: #fff;
   color: var(--oficina-preto);
-  border-bottom: 2px solid var(--oficina-vermelho);
+  border-right: 2px solid var(--oficina-vermelho);
+  overflow-y: auto;
 }
-.admin-brand img { display: block; height: 40px; width: auto; }
-.admin-nav a { color: var(--navy-800); border-radius: 4px; }
+.admin-brand { padding: 0 6px 14px; border-bottom: 1px solid var(--gray-100); }
+.admin-brand img { display: block; height: auto; width: 100%; max-width: 190px; }
+
+.admin-nav { flex-direction: column; flex-wrap: nowrap; gap: 4px; flex: 1; }
+.admin-nav a {
+  display: block;
+  color: var(--navy-800);
+  border-radius: 4px;
+  padding: 11px 14px;
+  font-size: 0.95rem;
+  border-left: 4px solid transparent;
+}
 .admin-nav a:hover { color: var(--oficina-vermelho); background: rgba(217, 48, 53, 0.08); }
-.admin-nav a.active { color: #fff; background: var(--oficina-vermelho); }
-.admin-user { color: var(--navy-700); }
+.admin-nav a.active { color: #fff; background: var(--oficina-vermelho); border-left-color: var(--oficina-preto); }
+
+.admin-user {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--gray-100);
+  color: var(--navy-700);
+  font-size: 0.85rem;
+}
 .admin-user a { color: var(--navy-700) !important; }
-.admin-user button { color: var(--oficina-preto); border: 1px solid var(--oficina-preto); border-radius: 4px; }
+.admin-user button { color: var(--oficina-preto); border: 1px solid var(--oficina-preto); border-radius: 4px; width: 100%; }
 .admin-user button:hover { background: var(--oficina-preto); color: #fff; }
+
+/* Telas estreitas: a barra volta a ser um cabeçalho no topo */
+@media (max-width: 900px) {
+  body.admin-body { padding-left: 0; }
+  .admin-header {
+    position: static; width: auto; bottom: auto;
+    flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    border-right: 0; border-bottom: 2px solid var(--oficina-vermelho); padding: 12px 16px; gap: 10px;
+  }
+  .admin-brand { padding: 0; border: 0; }
+  .admin-brand img { height: 36px; width: auto; }
+  .admin-nav { flex-direction: row; flex-wrap: wrap; flex: 1 1 100%; gap: 4px; order: 3; }
+  .admin-nav a { padding: 7px 12px; font-size: 0.85rem; border-left: 0; }
+  .admin-user { flex-direction: row; align-items: center; border: 0; padding: 0; }
+  .admin-user button { width: auto; }
+}
+
+@media print {
+  body.admin-body { padding-left: 0; }
+  .admin-header { display: none; }
+}
 
 /* ===== Botões ===== */
 .btn { border-radius: 4px; }
