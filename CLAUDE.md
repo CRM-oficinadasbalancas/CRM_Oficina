@@ -29,6 +29,15 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
   Migrar lead para a AT = marcar Tipo "Cliente da Oficina" na ficha (a ficha oferece ao marcar Ganho). AT/estoque começam zerados.
 - Estoque: só o admin altera (e vê a tela). Técnico só alimenta chamados (assistências/equipamentos) e LÊ as peças; apagar chamado/equipamento = admin.
   A baixa no estoque é automática por gatilho (`private.ajustar_estoque_assistencia`, migration 0014): usar peça desconta, trocar reajusta, "não aprovado"/apagar devolve.
+- **Chamados de campo e oficina interna** (migrations 0015/0016, `admin/chamados.html`, `admin/js/chamados-lib.js`, `app/`):
+  perfis `programadora` (abre/programa chamados de campo, escolhe técnico e data, aprova/recusa orçamento), `recepcao` (abre chamados da
+  oficina interna com defeito + selo/lacre antigos, aprova/recusa orçamento), `tecnico` (campo: só vê os chamados programados para ele),
+  `oficina_interna` (faz a manutenção dos orçados). Status: aberta → em_andamento → concluida; técnico pode mandar para `pendente`
+  (= transferido para a oficina, aguardando orçamento); `orcamento_aprovado` segue p/ oficina; `nao_aprovada` = orçamento recusado (devolver).
+  Fechar exige histórico + selo/lacre novos e antigos (antigo dispensável com "Não possui"); pendência exige só o histórico. Peça opcional (sem peça não baixa).
+  Regras no banco (`private.validar_chamado`); histórico em `chamado_historico`. Rota: `chOtimizarRota` (vizinho mais próximo + 2-opt), endereços
+  localizados com Nominatim e guardados em `clientes.latitude/longitude`. Agenda do técnico prioriza a data de abertura (mais antigo primeiro).
+  Perfil `tecnico` só acessa `chamados` no PC; admin/técnico/oficina interna no celular caem em `/app/`.
 - App de chamados no celular (`/app/`, sem instalar): o MESMO endereço do sistema. Técnico no celular é levado do sistema para `/app/` (auth-guard `ehCelular()`);
   no PC, `/app/` manda para o sistema completo. `?desktop=1` força o sistema no celular; `?mobile=1` abre o app no PC. Mesmo login (mesma sessão do navegador).
   Para técnico e admin; mesmo Supabase/RLS. Sem service worker/manifest (a versão instalável foi removida).

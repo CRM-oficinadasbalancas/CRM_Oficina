@@ -12,7 +12,14 @@ var fieldIds = [
 
 // Tipo "Cliente da Oficina" não usa funil nem canal de aquisição: esconde os
 // campos (os valores já gravados ficam intactos, só não aparecem).
+function somenteClienteOficina() { return ['programadora', 'recepcao'].indexOf(window.ADMIN_ROLE) !== -1; }
+
 function atualizarCamposPorTipo() {
+  if (somenteClienteOficina()) {
+    var sel = document.getElementById('eh_cliente');
+    sel.value = 'true';
+    sel.closest('.form-field').style.display = 'none';
+  }
   var ehCliente = document.getElementById('eh_cliente').value === 'true';
   ['categoria', 'canal_aquisicao', 'situacao'].forEach(function (id) {
     document.getElementById(id).closest('.form-field').style.display = ehCliente ? 'none' : '';
@@ -271,7 +278,7 @@ document.getElementById('cliente-form').addEventListener('submit', async functio
     result = await supabaseClient.from('clientes').update(values).eq('id', clienteId);
   } else {
     values.created_by = currentUserId;
-    result = await supabaseClient.from('clientes').insert(values);
+    result = await supabaseClient.from('clientes').insert(values).select('id').single();
   }
 
   saveBtn.disabled = false;
@@ -284,9 +291,25 @@ document.getElementById('cliente-form').addEventListener('submit', async functio
   }
 
   showToast('Cliente salvo com sucesso.', 'ok');
+  var idSalvo = clienteId || (result.data && result.data.id);
+  var valoresSalvos = values;
   resetForm();
   loadClientes();
+  if (idSalvo && valoresSalvos.eh_cliente && (valoresSalvos.logradouro || valoresSalvos.cep)) {
+    localizarClienteNoMapa(idSalvo, valoresSalvos);
+  }
 });
+
+// Para a rota dos técnicos: guarda a posição do endereço do cliente da Oficina.
+async function localizarClienteNoMapa(id, dados) {
+  var pos = await geocodificarEndereco(dados);
+  if (!pos) {
+    showToast('Não consegui localizar o endereço no mapa. Confira rua, número e cidade para a rota do técnico.', 'warning');
+    return;
+  }
+  await supabaseClient.from('clientes').update({ latitude: pos.lat, longitude: pos.lng, geocodificado_em: new Date().toISOString() }).eq('id', id);
+  showToast('Endereço localizado no mapa (rota do técnico).', 'ok');
+}
 
 document.getElementById('cliente-cancel-btn').addEventListener('click', resetForm);
 
@@ -295,6 +318,7 @@ document.getElementById('cliente-cancel-btn').addEventListener('click', resetFor
   if (!auth) return;
   currentUserId = auth.session.user.id;
   await loadClientes();
+  atualizarCamposPorTipo();
 
   var params = new URLSearchParams(location.search);
   var editarId = params.get('editar');

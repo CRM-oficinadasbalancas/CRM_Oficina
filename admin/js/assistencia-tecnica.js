@@ -16,15 +16,17 @@ var QUANTIDADE_PECA_REGEX = /^\d{1,5}(\.\d{1,2})?$/;
 var STATUS_LABELS = {
   aberta: 'Aberta',
   em_andamento: 'Em andamento',
-  pendente: 'Pendente',
-  concluida: 'Concluída',
-  nao_aprovada: 'Não aprovado pelo cliente'
+  pendente: 'Pendente (oficina — aguardando orçamento)',
+  orcamento_aprovado: 'Orçamento aprovado',
+  concluida: 'Fechada',
+  nao_aprovada: 'Orçamento recusado'
 };
 
 var STATUS_BADGE_CLASS = {
   aberta: 'badge-warning',
   em_andamento: 'badge-warning',
   pendente: 'badge-warning',
+  orcamento_aprovado: 'badge-info',
   concluida: 'badge-ok',
   nao_aprovada: 'badge-danger'
 };

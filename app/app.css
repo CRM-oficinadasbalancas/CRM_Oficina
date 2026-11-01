@@ -100,3 +100,37 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--vermelho); 
 .aviso.ok { background: #1e6b3c; }
 
 .topo-link { color: #fff; font-size: 0.82rem; font-weight: 600; text-decoration: underline; margin-left: auto; margin-right: 10px; }
+
+/* ===== Agenda / chamado (fluxo de campo) ===== */
+.btn-escuro { background: var(--carvao); color: #fff; }
+.btn-escuro:active { background: #000; }
+.saudacao { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 16px 4px; }
+.saudacao strong { font-size: 1.05rem; }
+.saudacao .dica { margin: 0; }
+.btn-atualizar { font: inherit; font-weight: 700; font-size: 0.85rem; background: #fff; border: 1px solid var(--borda); border-radius: 6px; padding: 8px 14px; color: var(--carvao); }
+.rota { padding: 6px 16px 0; }
+.rota .btn-bloco { margin-top: 8px; display: block; text-align: center; text-decoration: none; }
+.lista { padding: 4px 14px 40px; display: flex; flex-direction: column; gap: 10px; }
+.sub-titulo { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 16px 2px 2px; }
+.contagem { background: #e6e6e1; border-radius: 999px; padding: 1px 8px; color: var(--carvao); margin-left: 4px; }
+.card.s-orcamento_aprovado { border-left-color: #4a2fa0; }
+.b-orcamento_aprovado { background: #e8e0fb; color: #4a2fa0; }
+.card-cli { font-size: 1.05rem; }
+.card-end { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+.card-dist { color: var(--vermelho); font-weight: 700; white-space: nowrap; }
+.parada { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 50%; background: var(--vermelho); color: #fff; font-size: 0.85rem; margin-right: 8px; }
+.detalhe { padding: 8px 14px 60px; max-width: 640px; margin: 0 auto; }
+.detalhe .caixa { margin-top: 12px; padding-top: 14px; }
+.cli-nome { font-weight: 800; font-size: 1.15rem; margin-bottom: 6px; }
+.linha-link { display: block; color: var(--vermelho); font-weight: 700; padding: 6px 0; text-decoration: none; }
+.linha-txt { color: var(--muted); font-size: 0.92rem; padding: 2px 0 6px; }
+.par { padding: 7px 0; border-bottom: 1px solid #efefea; font-size: 0.95rem; }
+.par:last-child { border-bottom: 0; }
+.par b { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 2px; }
+.acoes { margin-top: 12px; }
+.acoes .btn-bloco { margin-top: 10px; }
+.marcar { display: flex; align-items: center; gap: 10px; font-weight: 500; margin: 8px 0 0; }
+.marcar input { width: 22px; height: 22px; flex: 0 0 auto; }
+.hist-item { background: #fff; border-left: 3px solid var(--borda); border-radius: 4px; padding: 8px 12px; margin-bottom: 8px; font-size: 0.92rem; }
+.hist-item small { display: block; color: var(--muted); font-size: 0.75rem; margin-bottom: 2px; }
+.vazio { text-align: center; color: var(--muted); padding: 40px 10px; }

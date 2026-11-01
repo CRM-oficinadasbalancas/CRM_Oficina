@@ -37,8 +37,8 @@ window.ADMIN_AUTH_READY = (async function () {
     return new Promise(function () {});
   }
 
-  // Técnico no celular usa a tela de chamados (/app/), que já trata a troca de senha.
-  if (profile.role === 'tecnico' && ehCelular() && !forcouDesktop()) {
+  // Técnico, oficina interna e admin no celular usam a tela de chamados (/app/), que já trata a troca de senha.
+  if (['tecnico', 'oficina_interna', 'admin'].indexOf(profile.role) !== -1 && ehCelular() && !forcouDesktop()) {
     location.replace('../app/');
     return new Promise(function () {});
   }
@@ -51,7 +51,10 @@ window.ADMIN_AUTH_READY = (async function () {
   // Admin vê tudo. Técnico e Atendente só acessam as páginas do próprio
   // perfil — tanto por URL direta quanto pelos links do menu.
   var PAGINAS_POR_ROLE = {
-    tecnico: ['dashboard', 'assistencia-tecnica', 'manutencao'],
+    tecnico: ['chamados'],
+    oficina_interna: ['chamados'],
+    programadora: ['chamados', 'clientes'],
+    recepcao: ['chamados', 'clientes'],
     atendente: ['dashboard', 'clientes', 'vendas', 'pos-venda'],
     vendedor: ['vendas', 'manutencao', 'pos-venda']
   };

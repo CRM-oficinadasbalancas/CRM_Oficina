@@ -1,6 +1,9 @@
 var allUsuarios = [];
 
-var ROLE_LABELS = { admin: 'Administrador', tecnico: 'Técnico', atendente: 'Atendente', vendedor: 'Vendedor' };
+var ROLE_LABELS = {
+  admin: 'Administrador', atendente: 'Atendente (CRM)', vendedor: 'Vendedor',
+  tecnico: 'Técnico (campo)', oficina_interna: 'Oficina interna', programadora: 'Programação de chamados', recepcao: 'Recepção da oficina'
+};
 
 async function chamarGerenciarUsuario(payload) {
   var { data: { session } } = await supabaseClient.auth.getSession();

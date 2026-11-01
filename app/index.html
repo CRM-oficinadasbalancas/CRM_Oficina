@@ -50,92 +50,47 @@
 <section id="view-sem-acesso" class="tela tela-centro" hidden>
   <div class="cartao-login">
     <h1>Sem acesso</h1>
-    <p class="dica">Este app é só para técnicos e administradores. Peça ao administrador para ajustar o seu perfil.</p>
+    <p class="dica">Este app é para técnicos de campo e da oficina interna. Peça ao administrador para ajustar o seu perfil.</p>
     <button type="button" class="btn btn-vermelho btn-bloco" data-sair>Sair</button>
   </div>
 </section>
 
-<!-- LISTA DE CHAMADOS -->
-<section id="view-lista" class="tela" hidden>
+<!-- AGENDA (tela principal) -->
+<section id="view-agenda" class="tela" hidden>
   <header class="topo">
     <img src="../assets/img/logo-oficina-branca.png" alt="Oficina das Balanças" class="topo-logo">
     <a href="../admin/dashboard.html?desktop=1" class="topo-link">Sistema completo</a>
     <button type="button" class="topo-sair" data-sair>Sair</button>
   </header>
-  <div class="barra-filtros">
-    <input id="busca" type="search" placeholder="Buscar por nº, cliente ou equipamento" inputmode="search">
-    <div class="chips" id="chips">
-      <button type="button" class="chip ativo" data-status="">Todos</button>
-      <button type="button" class="chip" data-status="aberta">Abertas</button>
-      <button type="button" class="chip" data-status="em_andamento">Em andamento</button>
-      <button type="button" class="chip" data-status="pendente">Pendentes</button>
-      <button type="button" class="chip" data-status="concluida">Concluídas</button>
-      <button type="button" class="chip" data-status="nao_aprovada">Não aprovadas</button>
-    </div>
+  <div class="saudacao">
+    <div><strong id="ag-nome">Olá</strong><span id="ag-sub" class="dica"></span></div>
+    <button type="button" class="btn-atualizar" id="btn-atualizar">Atualizar</button>
   </div>
-  <div id="lista" class="lista"></div>
-  <button type="button" class="fab" id="btn-novo">+ Novo chamado</button>
+
+  <div id="bloco-rota" class="rota" hidden>
+    <button type="button" class="btn btn-escuro btn-bloco" id="btn-rota">Otimizar rota de hoje</button>
+    <p class="dica" id="rota-info"></p>
+    <a class="btn btn-vermelho btn-bloco" id="rota-mapa" href="#" target="_blank" rel="noopener" hidden>Abrir rota no mapa</a>
+  </div>
+
+  <div id="agenda" class="lista"></div>
 </section>
 
-<!-- FORMULÁRIO DO CHAMADO -->
-<section id="view-form" class="tela" hidden>
+<!-- CHAMADO -->
+<section id="view-chamado" class="tela" hidden>
   <header class="topo">
-    <button type="button" class="topo-voltar" id="btn-voltar">‹ Voltar</button>
-    <strong id="form-titulo">Novo chamado</strong>
+    <button type="button" class="topo-voltar" id="btn-voltar">‹ Agenda</button>
+    <strong id="ch-titulo">Chamado</strong>
     <span></span>
   </header>
-  <form id="form-chamado" class="form">
-    <div id="bloco-cliente">
-      <label for="cli-busca">Cliente *</label>
-      <input id="cli-busca" type="search" placeholder="Digite para filtrar o cliente">
-      <select id="cli-select" size="1"></select>
-      <p class="dica" id="cli-dica">Só aparecem os clientes da Oficina. Cliente novo: peça ao administrador para cadastrar.</p>
-
-      <label for="eq-select">Equipamento *</label>
-      <select id="eq-select"></select>
-      <div id="eq-novo" class="caixa" hidden>
-        <label for="eq-marca">Marca</label><input id="eq-marca" type="text" maxlength="100" placeholder="Ex: Toledo">
-        <label for="eq-modelo">Modelo</label><input id="eq-modelo" type="text" maxlength="100" placeholder="Ex: 9091-B/15">
-        <label for="eq-serie">Nº de série *</label><input id="eq-serie" type="text" maxlength="20" placeholder="Letras e números, até 20" autocapitalize="characters">
-      </div>
-    </div>
-    <div id="bloco-cliente-fixo" class="caixa" hidden></div>
-
-    <label for="defeito">Defeito *</label>
-    <textarea id="defeito" rows="4" maxlength="5000" placeholder="O que o cliente relatou / o que você encontrou"></textarea>
-
-    <label for="status">Status</label>
-    <select id="status">
-      <option value="aberta">Aberta</option>
-      <option value="em_andamento">Em andamento</option>
-      <option value="pendente">Pendente (congela o prazo)</option>
-      <option value="concluida">Concluída</option>
-      <option value="nao_aprovada">Não aprovado pelo cliente</option>
-    </select>
-
-    <label for="resolucao">Resolução <span id="res-obrig" hidden>*</span></label>
-    <textarea id="resolucao" rows="3" maxlength="5000" placeholder="O que foi feito (obrigatório para concluir ou para não aprovado)"></textarea>
-
-    <div class="caixa" id="bloco-peca">
-      <label for="peca">Peça utilizada</label>
-      <select id="peca"></select>
-      <p class="dica" id="peca-info"></p>
-      <label for="peca-qtd">Quantidade usada</label>
-      <input id="peca-qtd" type="text" inputmode="decimal" maxlength="8" placeholder="Ex: 1">
-      <p class="dica">O estoque é descontado automaticamente ao salvar.</p>
-    </div>
-
-    <details class="caixa">
-      <summary>Selos e lacres (opcional)</summary>
-      <label for="selo-antigo">Selo antigo</label><input id="selo-antigo" type="text" maxlength="20">
-      <label for="selo-novo">Selo novo</label><input id="selo-novo" type="text" maxlength="20">
-      <label for="lacre-antigo">Lacre antigo</label><input id="lacre-antigo" type="text" maxlength="20">
-      <label for="lacre-novo">Lacre novo</label><input id="lacre-novo" type="text" maxlength="20">
-    </details>
-
-    <p id="form-erro" class="erro" hidden></p>
-    <button type="submit" class="btn btn-vermelho btn-bloco" id="btn-salvar">Salvar chamado</button>
-  </form>
+  <div class="detalhe">
+    <div class="caixa" id="ch-cliente"></div>
+    <div class="caixa" id="ch-dados"></div>
+    <div id="ch-acoes" class="acoes"></div>
+    <div id="ch-form"></div>
+    <h3 class="sub-titulo">Histórico</h3>
+    <div id="ch-hist" class="hist"></div>
+  </div>
 </section>
 
 <div id="aviso" class="aviso" hidden></div>
@@ -143,6 +98,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../admin/js/admin-config.js"></script>
 <script src="../admin/js/supabase-client.js"></script>
+<script src="../admin/js/chamados-lib.js"></script>
+<script src="../admin/js/geocodificar.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

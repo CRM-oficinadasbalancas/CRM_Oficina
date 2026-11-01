@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chamados — CRM Oficina das Balanças</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="../assets/img/favicon-192.png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="css/tema-oficina.css">
+<style>
+  .ch-barra { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px; }
+  .ch-barra .btn { padding:10px 18px; }
+  .ch-chips { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 14px; }
+  .ch-chip { font:inherit; font-weight:700; font-size:0.85rem; padding:8px 14px; border-radius:4px; border:1px solid #1b1b18; background:#fff; color:#1b1b18; cursor:pointer; }
+  .ch-chip.ativo { background:#d93035; border-color:#d93035; color:#fff; }
+  .ch-chip small { opacity:0.8; margin-left:4px; }
+  .ch-st { display:inline-block; font-size:0.72rem; font-weight:700; text-transform:uppercase; padding:4px 9px; border-radius:999px; background:#eee; white-space:nowrap; }
+  .st-aberta { background:#fff3cd; color:#8a6100; } .st-em_andamento { background:#dfeeff; color:#0b57b0; }
+  .st-pendente { background:#fbe1e1; color:#a92323; } .st-orcamento_aprovado { background:#e8e0fb; color:#4a2fa0; }
+  .st-nao_aprovada { background:#ececea; color:#55554f; } .st-concluida { background:#dcf3e4; color:#1e6b3c; }
+  .tipo-tag { font-size:0.72rem; font-weight:700; color:#6b6b66; text-transform:uppercase; }
+  .ch-linha { cursor:pointer; } .ch-linha:hover td { background:#f5f5f3; }
+  .ch-sec { margin:18px 0 8px; font-size:0.95rem; }
+  .ch-hist { border-left:3px solid #dcdcd6; padding:6px 0 6px 12px; margin-bottom:8px; }
+  .ch-hist small { color:#8b95a7; display:block; }
+  .ch-acoes { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 4px; }
+  .ch-painel { background:#f5f5f3; border-radius:8px; padding:14px; margin-top:12px; }
+  .ch-painel .form-field { margin-bottom:10px; }
+  .ch-info { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:8px 18px; font-size:0.92rem; }
+  .ch-info b { display:block; font-size:0.72rem; text-transform:uppercase; color:#8b95a7; }
+  .check-linha { display:flex; align-items:center; gap:8px; font-size:0.88rem; margin-top:6px; }
+  .check-linha input { width:auto; }
+  .erro-msg { color:#a92323; background:#fbe1e1; border-radius:6px; padding:8px 12px; margin:10px 0; font-size:0.9rem; }
+</style>
+</head>
+<body class="admin-body">
+
+<header class="admin-header">
+  <a href="dashboard.html" class="admin-brand"><img src="../assets/img/logo-oficina-branca.png" alt="Oficina das Balanças"></a>
+  <nav class="admin-nav">
+    <a href="dashboard.html" data-role="atendente">Dashboard</a>
+    <a href="vendas.html" data-role="atendente vendedor">Vendas</a>
+    <a href="manutencao.html" data-role="vendedor">Manutenção</a>
+    <a href="pos-venda.html" data-role="atendente vendedor">Pós-venda</a>
+    <a href="chamados.html" class="active" data-role="programadora recepcao tecnico oficina_interna">Chamados</a>
+    <a href="assistencia-tecnica.html" data-role="admin">Assistência Técnica</a>
+    <a href="relatorios.html" data-role="admin">Relatórios</a>
+    <a href="estoque.html" data-role="admin">Estoque</a>
+    <a href="clientes.html" data-role="atendente programadora recepcao">Clientes</a>
+    <a href="usuarios.html" data-role="admin">Usuários</a>
+  </nav>
+  <div class="admin-user">
+    <span>Olá, <span data-user-name>—</span></span>
+    <a href="trocar-senha.html" style="color:#cfd9ea; font-size:0.85rem;">Trocar senha</a>
+    <button data-logout>Sair</button>
+  </div>
+</header>
+
+<main class="admin-main">
+  <h1 class="admin-title">Chamados</h1>
+
+  <div class="ch-barra">
+    <button type="button" class="btn btn-primary" id="btn-novo-campo" hidden>+ Chamado de campo</button>
+    <button type="button" class="btn btn-primary" id="btn-novo-oficina" hidden>+ Chamado da oficina interna</button>
+    <a href="clientes.html" class="btn btn-outline" id="link-clientes" hidden>Cadastrar cliente</a>
+    <input type="search" id="ch-busca" class="table-search" placeholder="Buscar por nº, cliente, equipamento ou defeito" style="margin-left:auto; min-width:260px;">
+  </div>
+
+  <div class="ch-chips" id="ch-chips"></div>
+
+  <div class="admin-card">
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead><tr><th>Nº</th><th>Abertura</th><th>Cliente</th><th>Equipamento</th><th>Defeito</th><th>Técnico / agenda</th><th>Status</th></tr></thead>
+        <tbody id="ch-tbody"><tr><td colspan="7">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- NOVO CHAMADO -->
+<div class="modal-overlay" id="modal-novo">
+  <div class="modal-box" style="max-width:640px;">
+    <h3 id="novo-titulo">Novo chamado</h3>
+    <div class="form-field"><label for="n-cli-busca">Cliente *</label>
+      <input type="search" id="n-cli-busca" placeholder="Digite para filtrar o cliente">
+      <select id="n-cliente" style="margin-top:6px;"></select>
+      <span class="hint">Só clientes da Oficina. Não achou? <a href="clientes.html" style="color:#d93035; font-weight:600;">Cadastre o cliente</a>.</span>
+    </div>
+    <div class="form-field"><label for="n-equip">Equipamento *</label><select id="n-equip"></select></div>
+    <div id="n-equip-novo" class="ch-painel" hidden>
+      <div class="form-field"><label for="n-eq-marca">Marca</label><input type="text" id="n-eq-marca" maxlength="100"></div>
+      <div class="form-field"><label for="n-eq-modelo">Modelo</label><input type="text" id="n-eq-modelo" maxlength="100"></div>
+      <div class="form-field"><label for="n-eq-serie">Nº de série *</label><input type="text" id="n-eq-serie" maxlength="20" placeholder="Letras e números, até 20"></div>
+    </div>
+    <div class="form-field"><label for="n-defeito">Defeito *</label><textarea id="n-defeito" rows="3" maxlength="5000"></textarea></div>
+
+    <div id="n-bloco-campo">
+      <div class="form-grid">
+        <div class="form-field"><label for="n-tecnico">Técnico *</label><select id="n-tecnico"></select></div>
+        <div class="form-field"><label for="n-data">Data da visita *</label><input type="date" id="n-data"></div>
+      </div>
+    </div>
+    <div id="n-bloco-oficina">
+      <div class="form-grid">
+        <div class="form-field"><label for="n-selo">Selo antigo</label><input type="text" id="n-selo" maxlength="20">
+          <label class="check-linha"><input type="checkbox" id="n-selo-aus"> Não possui selo</label></div>
+        <div class="form-field"><label for="n-lacre">Lacre antigo</label><input type="text" id="n-lacre" maxlength="20">
+          <label class="check-linha"><input type="checkbox" id="n-lacre-aus"> Não possui lacre</label></div>
+      </div>
+    </div>
+
+    <p class="erro-msg" id="novo-erro" hidden></p>
+    <div class="form-actions">
+      <button type="button" class="btn btn-primary" id="n-salvar">Abrir chamado</button>
+      <button type="button" class="btn btn-outline" id="n-cancelar">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETALHE DO CHAMADO -->
+<div class="modal-overlay" id="modal-det">
+  <div class="modal-box" style="max-width:760px;">
+    <h3 id="d-titulo">Chamado</h3>
+    <div class="ch-info" id="d-info"></div>
+    <div class="ch-acoes" id="d-acoes"></div>
+    <div id="d-painel"></div>
+    <h4 class="ch-sec">Histórico</h4>
+    <div id="d-hist">Carregando...</div>
+    <div class="form-actions"><button type="button" class="btn btn-outline" id="d-fechar">Fechar</button></div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/admin-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/chamados-lib.js"></script>
+<script src="js/chamados.js"></script>
+</body>
+</html>
