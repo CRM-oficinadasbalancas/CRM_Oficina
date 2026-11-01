@@ -61,6 +61,13 @@
           <label for="situacao">Situação</label>
           <select id="situacao"></select>
         </div>
+        <div class="form-field">
+          <label for="eh_cliente">Tipo</label>
+          <select id="eh_cliente">
+            <option value="false">Lead (funis)</option>
+            <option value="true">Cliente da Oficina (Assistência Técnica)</option>
+          </select>
+        </div>
       </div>
 
       <div class="form-grid" style="margin-bottom:20px;">
@@ -187,12 +194,18 @@
       <button type="button" class="btn btn-outline" id="btn-abrir-importar-cliente">Importar planilha</button>
     </div>
     <input type="text" id="cliente-search" class="table-search" placeholder="Buscar por nome, CNPJ...">
+    <select id="cliente-filtro-tipo" class="table-search" style="max-width:220px;">
+      <option value="">Todos</option>
+      <option value="true">Clientes da Oficina</option>
+      <option value="false">Leads</option>
+    </select>
     <div class="table-scroll">
       <table class="admin-table">
         <thead>
           <tr>
             <th>Nome</th>
             <th>Categoria</th>
+            <th>Tipo</th>
             <th>Canal</th>
             <th>Prazo</th>
             <th>Contato</th>

@@ -4,7 +4,7 @@ var allClientes = [];
 var CATEGORIA_LABELS = { venda: 'Venda', manutencao: 'Manutenção', pos_venda: 'Pós-venda' };
 
 var fieldIds = [
-  'codigo', 'cnpj_cpf', 'razao_social', 'nome_fantasia', 'ie', 'categoria', 'canal_aquisicao', 'situacao',
+  'codigo', 'cnpj_cpf', 'razao_social', 'nome_fantasia', 'ie', 'categoria', 'canal_aquisicao', 'situacao', 'eh_cliente',
   'logradouro', 'numero', 'complemento', 'bairro', 'cep', 'municipio', 'uf',
   'telefone_empresa', 'email_empresa', 'contato_nome', 'contato_telefone', 'contato_email',
   'forma_pagamento_padrao', 'local_entrega_preferencial', 'observacoes'
@@ -16,12 +16,13 @@ function getFormValues() {
     values[id] = document.getElementById(id).value.trim() || null;
   });
   if (!values.situacao) values.situacao = 'ativo'; // coluna not null
+  values.eh_cliente = document.getElementById('eh_cliente').value === 'true';
   return values;
 }
 
 function setFormValues(cliente) {
   fieldIds.forEach(function (id) {
-    document.getElementById(id).value = cliente && cliente[id] != null ? cliente[id] : '';
+    document.getElementById(id).value = cliente && cliente[id] != null ? String(cliente[id]) : (id === 'eh_cliente' ? 'false' : '');
   });
 }
 
@@ -85,7 +86,7 @@ function iniciarEdicaoClientePorId(clienteId) {
 function renderClientesTable(list) {
   var tbody = document.getElementById('clientes-tbody');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="7">Nenhum cliente cadastrado ainda.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">Nenhum cliente cadastrado ainda.</td></tr>';
     return;
   }
 
@@ -95,6 +96,7 @@ function renderClientesTable(list) {
     var badgeDuplicado = (cnpjNormalizado && cnpjDuplicadoMap[cnpjNormalizado] > 1) ? ' <span class="badge badge-warning">CNPJ/CPF duplicado</span>' : '';
     var categoria = c.categoria ? CATEGORIA_LABELS[c.categoria] : '—';
     var canal = c.canal_aquisicao || '—';
+    var tipo = c.eh_cliente ? '<span class="badge badge-ok">Cliente</span>' : '<span class="badge badge-info">Lead</span>';
     var prazoTexto = '—';
     if (c.categoria || (c.situacao && c.situacao !== 'ativo')) {
       var retorno = calcularProximoRetorno(c, historicoPorClienteMap[c.id] || []);
@@ -104,13 +106,14 @@ function renderClientesTable(list) {
     return '<tr>' +
       '<td><button type="button" class="link-cliente" data-abrir="' + c.id + '">' + escHtml(c.razao_social || '') + '</button>' + badgeDuplicado + '</td>' +
       '<td>' + categoria + '</td>' +
+      '<td>' + tipo + '</td>' +
       '<td>' + canal + '</td>' +
       '<td>' + prazoTexto + '</td>' +
       '<td>' + contato + '</td>' +
       '<td>' + (c.cnpj_cpf || '—') + '</td>' +
       '<td class="row-actions">' +
         '<button data-abrir="' + c.id + '">Abrir</button>' +
-        '<button data-historico-assistencia="' + c.id + '">Assist. Técnica</button>' +
+        (c.eh_cliente ? '<button data-historico-assistencia="' + c.id + '">Assist. Técnica</button>' : '') +
         '<button data-edit="' + c.id + '">Editar</button>' +
         '<button data-delete="' + c.id + '" class="danger">Excluir</button>' +
       '</td>' +
@@ -161,15 +164,19 @@ function renderClientesTable(list) {
 /* ===================== HISTÓRICO DE FOLLOW-UP ===================== */
 
 
-document.getElementById('cliente-search').addEventListener('input', function (e) {
-  var term = e.target.value.toLowerCase();
+function aplicarFiltrosClientes() {
+  var term = document.getElementById('cliente-search').value.toLowerCase();
+  var tipo = document.getElementById('cliente-filtro-tipo').value;
   var filtered = allClientes.filter(function (c) {
+    if (tipo && String(!!c.eh_cliente) !== tipo) return false;
     return (c.razao_social || '').toLowerCase().includes(term) ||
       (c.nome_fantasia || '').toLowerCase().includes(term) ||
       (c.cnpj_cpf || '').toLowerCase().includes(term);
   });
   renderClientesTable(filtered);
-});
+}
+document.getElementById('cliente-search').addEventListener('input', aplicarFiltrosClientes);
+document.getElementById('cliente-filtro-tipo').addEventListener('change', aplicarFiltrosClientes);
 
 document.getElementById('btn-buscar-cnpj').addEventListener('click', async function () {
   var cnpjInput = document.getElementById('cnpj_cpf');
@@ -275,6 +282,8 @@ document.getElementById('cliente-cancel-btn').addEventListener('click', resetFor
   var editarId = params.get('editar');
   if (editarId) {
     iniciarEdicaoClientePorId(editarId);
+  } else if (params.get('novo') === 'cliente') {
+    document.getElementById('eh_cliente').value = 'true'; // vindo da Assistência Técnica
   }
 })();
 
@@ -447,6 +456,7 @@ if (importarClienteBtnConfirmar) importarClienteBtnConfirmar.addEventListener('c
     var payload = {};
     fieldIds.forEach(function (chave) { payload[chave] = linha[chave] || null; });
     if (!payload.situacao) delete payload.situacao; // mantém o padrão do banco (ativo)
+    if (payload.eh_cliente == null) delete payload.eh_cliente;
 
     var cnpjNormalizado = normalizarCnpj(linha.cnpj_cpf);
     var existente = cnpjNormalizado && allClientes.find(function (c) { return normalizarCnpj(c.cnpj_cpf) === cnpjNormalizado; });

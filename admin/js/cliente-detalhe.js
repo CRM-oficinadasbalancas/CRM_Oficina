@@ -34,6 +34,9 @@ function garantirModalDetalhe() {
           '<option value="venda">Venda</option><option value="manutencao">Manutenção</option><option value="pos_venda">Pós-venda</option>' +
         '</select></div>' +
         '<div class="form-field"><label for="det-situacao">Situação</label><select id="det-situacao"></select></div>' +
+        '<div class="form-field"><label for="det-tipo">Tipo</label><select id="det-tipo">' +
+          '<option value="false">Lead (funis)</option><option value="true">Cliente da Oficina (Assistência Técnica)</option>' +
+        '</select></div>' +
       '</div>' +
       '<p id="det-erro" class="error-message" style="display:none;"></p>' +
       '<div class="form-actions" style="margin-bottom:8px;">' +
@@ -122,6 +125,7 @@ async function abrirClienteDetalhe(clienteId, opcoes) {
   document.getElementById('det-canal').innerHTML = opcoesCanalHtml(data.canal_aquisicao || '');
   document.getElementById('det-categoria').value = data.categoria || '';
   document.getElementById('det-situacao').innerHTML = opcoesSituacaoHtml(data.situacao || 'ativo');
+  document.getElementById('det-tipo').value = String(!!data.eh_cliente);
   document.getElementById('det-cadastro').href = 'clientes.html?editar=' + data.id;
   document.getElementById('det-erro').style.display = 'none';
   mostrarAddInfo(false);
@@ -167,6 +171,15 @@ async function salvarDadosDetalhe() {
   if (!nome) { erroEl.textContent = 'Nome é obrigatório.'; erroEl.style.display = 'block'; return; }
   if (!tel && !email) { erroEl.textContent = 'Preencha pelo menos o telefone ou o e-mail.'; erroEl.style.display = 'block'; return; }
 
+  // Lead que virou ganho: oferece migrar pra Assistência Técnica.
+  var tipoSel = document.getElementById('det-tipo');
+  var situacaoNova = document.getElementById('det-situacao').value;
+  if (situacaoNova === 'ganho' && detalheCliente.situacao !== 'ganho' && tipoSel.value === 'false') {
+    if (confirm('Este lead virou cliente. Migrar para a Assistência Técnica (marcar como Cliente da Oficina)?')) {
+      tipoSel.value = 'true';
+    }
+  }
+
   var btn = document.getElementById('det-salvar');
   btn.disabled = true;
   var { error } = await supabaseClient.from('clientes').update({
@@ -175,11 +188,13 @@ async function salvarDadosDetalhe() {
     email_empresa: email || null,
     canal_aquisicao: document.getElementById('det-canal').value || null,
     categoria: document.getElementById('det-categoria').value || null,
-    situacao: document.getElementById('det-situacao').value
+    situacao: situacaoNova,
+    eh_cliente: tipoSel.value === 'true'
   }).eq('id', detalheCliente.id);
   btn.disabled = false;
 
   if (error) { erroEl.textContent = 'Erro ao salvar: ' + error.message; erroEl.style.display = 'block'; return; }
+  detalheCliente.situacao = situacaoNova;
   document.getElementById('det-titulo').textContent = nome;
   showToast('Dados do cliente salvos.', 'ok');
   avisarMudancaDetalhe();

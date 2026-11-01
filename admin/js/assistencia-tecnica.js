@@ -115,7 +115,7 @@ function resetForm() {
 /* ===================== CLIENTE ===================== */
 
 async function loadClientesSelect() {
-  var { data, error } = await supabaseClient.from('clientes').select('*').order('razao_social');
+  var { data, error } = await supabaseClient.from('clientes').select('*').eq('eh_cliente', true).order('razao_social');
   if (error) { showToast('Erro ao carregar clientes: ' + error.message, 'error'); return; }
   clientesCache = data || [];
 
@@ -302,7 +302,7 @@ function abrirModalImportarEquipamento() {
 }
 
 document.getElementById('btn-abrir-importar-equipamento').addEventListener('click', function () {
-  if (!clientesCache.length) { showToast('Cadastre ao menos um cliente antes de importar equipamentos.', 'warning'); return; }
+  if (!clientesCache.length) { showToast('Cadastre ao menos um cliente da Oficina antes de importar equipamentos.', 'warning'); return; }
   abrirModalImportarEquipamento();
 });
 
