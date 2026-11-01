@@ -27,6 +27,8 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
 - Alertas por e-mail ao gerente: 12 horas úteis de atraso (seg–sex 8–18, almoço 13–14) e 3 negativas seguidas.
 - Leads (funis) não se misturam com a Assistência Técnica: `clientes.eh_cliente` (false = lead; true = cliente da Oficina, aparece na AT).
   Migrar lead para a AT = marcar Tipo "Cliente da Oficina" na ficha (a ficha oferece ao marcar Ganho). AT/estoque começam zerados.
+- Estoque: só o admin altera (e vê a tela). Técnico só alimenta chamados (assistências/equipamentos) e LÊ as peças; apagar chamado/equipamento = admin.
+  A baixa no estoque é automática por gatilho (`private.ajustar_estoque_assistencia`, migration 0014): usar peça desconta, trocar reajusta, "não aprovado"/apagar devolve.
 - Menu (lateral): Dashboard, Vendas, Manutenção, Pós-venda, Assistência Técnica, Estoque, Clientes, Usuários. Estoque e Assistência Técnica não mudam.
 - Dashboard estilo BI (Chart.js) + "Tratado hoje"/"Pendente" por funil; clicar no nome abre a ficha (`admin/js/cliente-detalhe.js`).
 

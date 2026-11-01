@@ -35,7 +35,7 @@ window.ADMIN_AUTH_READY = (async function () {
   // Admin vê tudo. Técnico e Atendente só acessam as páginas do próprio
   // perfil — tanto por URL direta quanto pelos links do menu.
   var PAGINAS_POR_ROLE = {
-    tecnico: ['dashboard', 'assistencia-tecnica', 'estoque', 'manutencao'],
+    tecnico: ['dashboard', 'assistencia-tecnica', 'manutencao'],
     atendente: ['dashboard', 'clientes', 'vendas', 'pos-venda'],
     vendedor: ['vendas', 'manutencao', 'pos-venda']
   };
