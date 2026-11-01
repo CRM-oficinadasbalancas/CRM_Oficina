@@ -3,7 +3,6 @@
 select cron.alter_job(
   job_id := (select jobid from cron.job where jobname = 'alertas-followup'),
   command := $cmd$
-  $$
   select net.http_post(
     url := 'https://gbahaegarnzgebgzeumk.supabase.co/functions/v1/alertas-followup',
     headers := jsonb_build_object(
