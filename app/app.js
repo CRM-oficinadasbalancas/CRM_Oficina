@@ -85,14 +85,45 @@ document.querySelectorAll('[data-sair]').forEach(function (b) {
 
 var SEL = '*, clientes(razao_social, telefone_empresa, logradouro, numero, bairro, municipio, uf, latitude, longitude), equipamentos(marca, modelo, numero_serie)';
 
+// Abas por perfil: técnico de rua = campo em aberto e fechados; oficina interna = o que está na oficina,
+// aguardando orçamento, orçamento aprovado e fechados.
+var ABAS = {
+  tecnico: [{ id: 'abertos', t: 'Em aberto' }, { id: 'fechados', t: 'Fechados' }],
+  oficina_interna: [{ id: 'abertos', t: 'Em aberto' }, { id: 'orcamento', t: 'Aguardando orçamento' }, { id: 'aprovados', t: 'Orçamento aprovado' }, { id: 'fechados', t: 'Fechados' }]
+};
+var ABA_TITULO = { abertos: 'Em aberto', orcamento: 'Aguardando orçamento', aprovados: 'Orçamento aprovado', fechados: 'Fechados (últimos 100)' };
+
+function desenharAbas() {
+  var abas = ABAS[estado.perfil.role];
+  $('abas').hidden = !abas;
+  if (!abas) return;
+  $('abas').innerHTML = abas.map(function (a) {
+    return '<button type="button" class="aba' + (a.id === (estado.aba || 'abertos') ? ' ativa' : '') + '" data-aba="' + a.id + '">' + a.t + '</button>';
+  }).join('');
+  $('abas').querySelectorAll('.aba').forEach(function (b) {
+    b.addEventListener('click', function () { estado.aba = b.dataset.aba; carregarAgenda(); });
+  });
+}
+
 async function carregarAgenda() {
   $('agenda').innerHTML = '<p class="vazio">Carregando...</p>';
   var papel = estado.perfil.role;
+  var aba = estado.aba || 'abertos';
+  desenharAbas();
   var q = supabaseClient.from('assistencias_tecnicas').select(SEL);
-  if (papel === 'tecnico') q = q.in('status', ['aberta', 'em_andamento']);
-  else if (papel === 'oficina_interna') q = q.eq('tipo', 'oficina').in('status', ['orcamento_aprovado', 'em_andamento']);
-  else q = q.in('status', ['aberta', 'em_andamento', 'orcamento_aprovado']);
-  var r = await q.order('created_at', { ascending: true }).limit(500);
+  if (papel === 'tecnico') {
+    q = aba === 'fechados' ? q.eq('status', 'concluida') : q.eq('tipo', 'campo').in('status', ['aberta', 'em_andamento']);
+  } else if (papel === 'oficina_interna') {
+    q = q.eq('tipo', 'oficina');
+    if (aba === 'fechados') q = q.eq('status', 'concluida');
+    else if (aba === 'orcamento') q = q.eq('status', 'pendente');
+    else if (aba === 'aprovados') q = q.eq('status', 'orcamento_aprovado');
+    else q = q.in('status', ['pendente', 'orcamento_aprovado', 'em_andamento']);
+  } else {
+    q = q.in('status', ['aberta', 'em_andamento', 'orcamento_aprovado']);
+  }
+  var fechados = ABAS[papel] && aba === 'fechados';
+  var r = fechados ? await q.order('fechado_em', { ascending: false, nullsFirst: false }).limit(100) : await q.order('created_at', { ascending: true }).limit(500);
   if (r.error) { $('agenda').innerHTML = '<p class="vazio">Não foi possível carregar. Verifique a internet e toque em Atualizar.</p>'; return; }
   estado.chamados = r.data || [];
   estado.rota = null;
@@ -111,7 +142,7 @@ function cartao(c, ordem) {
     '<div class="card-eq">' + esc(equipTxt(c)) + '</div>' +
     '<div class="card-end">' + esc(enderecoTxt(cl) || 'Endereço não informado') + ' ' + extra + '</div>' +
     '<div class="card-defeito">' + esc(c.descricao_defeito) + '</div>' +
-    '<div class="card-data">Aberto há ' + dias + ' dia' + (dias === 1 ? '' : 's') + (c.tipo === 'oficina' ? ' · oficina interna' : '') + '</div>' +
+    '<div class="card-data">' + (c.status === 'concluida' && c.fechado_em ? 'Fechado em ' + new Date(c.fechado_em).toLocaleDateString('pt-BR') : 'Aberto há ' + dias + ' dia' + (dias === 1 ? '' : 's')) + (c.tipo === 'oficina' ? ' · oficina interna' : '') + '</div>' +
   '</button>';
 }
 
@@ -129,8 +160,15 @@ function desenharAgenda() {
   var campo = lista.filter(function (c) { return c.tipo === 'campo'; });
   var oficina = lista.filter(function (c) { return c.tipo === 'oficina'; });
   var hoje = hojeISO();
+  var aba = estado.aba || 'abertos';
+  // abas que não são a agenda de campo: lista simples (fechados do mais recente ao mais antigo)
+  var plano = ABAS[papel] && (aba === 'fechados' || (papel === 'oficina_interna' && aba !== 'abertos'));
 
-  if (papel !== 'oficina_interna') {
+  if (plano) {
+    var ordenados = aba === 'fechados' ? estado.chamados : lista;
+    html += secao(ABA_TITULO[aba], ordenados, false);
+    $('bloco-rota').hidden = true;
+  } else if (papel !== 'oficina_interna') {
     var atrasados = campo.filter(function (c) { return c.data_agendada && c.data_agendada < hoje; });
     var deHoje = campo.filter(function (c) { return !c.data_agendada || c.data_agendada === hoje; });
     var proximos = campo.filter(function (c) { return c.data_agendada && c.data_agendada > hoje; });
@@ -142,10 +180,10 @@ function desenharAgenda() {
   } else {
     $('bloco-rota').hidden = true;
   }
-  if (papel !== 'tecnico') html += secao('Oficina interna — fila (mais antigos primeiro)', oficina, false);
+  if (!plano && papel !== 'tecnico') html += secao('Na oficina — mais antigos primeiro', oficina, false);
 
   var n = estado.chamados.length;
-  $('ag-sub').textContent = n ? ' · ' + n + ' chamado' + (n === 1 ? '' : 's') + ' em aberto' : '';
+  $('ag-sub').textContent = n ? ' · ' + n + ' chamado' + (n === 1 ? '' : 's') + (plano ? '' : ' em aberto') : '';
   $('agenda').innerHTML = html || '<p class="vazio">Nenhum chamado na sua agenda.</p>';
   $('agenda').querySelectorAll('.card').forEach(function (b) { b.addEventListener('click', function () { abrirChamado(b.dataset.id); }); });
 }

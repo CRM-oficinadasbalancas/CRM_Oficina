@@ -18,11 +18,28 @@ var FILTROS = [
   { id: 'abertos', rotulo: 'Em aberto', fn: function (c) { return ['aberta', 'em_andamento', 'pendente', 'orcamento_aprovado'].indexOf(c.status) !== -1; } },
   { id: 'campo', rotulo: 'Campo', fn: function (c) { return c.tipo === 'campo' && ['aberta', 'em_andamento'].indexOf(c.status) !== -1; } },
   { id: 'orcamento', rotulo: 'Aguardando orçamento', fn: function (c) { return c.status === 'pendente'; } },
+  { id: 'aprovados', rotulo: 'Orçamento aprovado', fn: function (c) { return c.status === 'orcamento_aprovado'; } },
   { id: 'oficina', rotulo: 'Oficina interna', fn: function (c) { return c.tipo === 'oficina' && ['orcamento_aprovado', 'em_andamento'].indexOf(c.status) !== -1; } },
   { id: 'fechados', rotulo: 'Fechados', fn: function (c) { return c.status === 'concluida'; } },
   { id: 'recusados', rotulo: 'Recusados', fn: function (c) { return c.status === 'nao_aprovada'; } },
   { id: 'todos', rotulo: 'Todos', fn: function () { return true; } }
 ];
+
+// Abas de cada perfil. Técnico de rua: só campo em aberto e fechados. Oficina interna: o que está na oficina
+// (em aberto), aguardando orçamento, orçamento aprovado e fechados. Os demais perfis veem todas.
+var FILTROS_POR_PAPEL = {
+  tecnico: [
+    { id: 'abertos', rotulo: 'Em aberto', fn: function (c) { return c.tipo === 'campo' && ['aberta', 'em_andamento'].indexOf(c.status) !== -1; } },
+    { id: 'fechados', rotulo: 'Fechados', fn: function (c) { return c.status === 'concluida'; } }
+  ],
+  oficina_interna: [
+    { id: 'abertos', rotulo: 'Em aberto', fn: function (c) { return c.tipo === 'oficina' && ['pendente', 'orcamento_aprovado', 'em_andamento'].indexOf(c.status) !== -1; } },
+    { id: 'orcamento', rotulo: 'Aguardando orçamento', fn: function (c) { return c.status === 'pendente'; } },
+    { id: 'aprovados', rotulo: 'Orçamento aprovado', fn: function (c) { return c.status === 'orcamento_aprovado'; } },
+    { id: 'fechados', rotulo: 'Fechados', fn: function (c) { return c.status === 'concluida'; } }
+  ]
+};
+function filtrosAtivos() { return FILTROS_POR_PAPEL[papel] || FILTROS; }
 
 /* ===================== LISTA ===================== */
 
@@ -35,7 +52,7 @@ async function carregar() {
 }
 
 function desenharChips() {
-  $('ch-chips').innerHTML = FILTROS.map(function (f) {
+  $('ch-chips').innerHTML = filtrosAtivos().map(function (f) {
     var n = chamados.filter(f.fn).length;
     return '<button type="button" class="ch-chip' + (f.id === filtro ? ' ativo' : '') + '" data-f="' + f.id + '">' + f.rotulo + '<small>' + n + '</small></button>';
   }).join('');
@@ -45,7 +62,7 @@ function desenharChips() {
 }
 
 function desenharLista() {
-  var f = FILTROS.find(function (x) { return x.id === filtro; });
+  var f = filtrosAtivos().find(function (x) { return x.id === filtro; }) || filtrosAtivos()[0];
   var termo = busca.trim().toLowerCase();
   var itens = chPorAbertura(chamados.filter(f.fn)).filter(function (c) {
     if (!termo) return true;
@@ -349,7 +366,7 @@ $('btn-novo').addEventListener('click', abrirNovo);
   var t = await supabaseClient.rpc('listar_tecnicos');
   tecnicos = t.data || [];
   // cada perfil começa no filtro que mais usa
-  filtro = papel === 'oficina_interna' ? 'oficina' : (papel === 'recepcao' ? 'orcamento' : (papel === 'programadora' ? 'campo' : 'abertos'));
+  filtro = papel === 'recepcao' ? 'orcamento' : (papel === 'programadora' ? 'campo' : 'abertos');
   await carregar();
   var alvo = new URLSearchParams(location.search).get('abrir');
   if (alvo) abrirDetalhe(alvo);

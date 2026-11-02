@@ -85,6 +85,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--vermelho); 
 .b-nao_aprovada { background: #ececea; color: #55554f; }
 .vazio { text-align: center; color: var(--muted); padding: 40px 10px; }
 
+.abas { display: flex; gap: 6px; overflow-x: auto; padding: 0 14px 10px; -webkit-overflow-scrolling: touch; }
+.abas[hidden] { display: none; }
+.aba { flex: 0 0 auto; border: 1px solid #cfcfca; background: #fff; color: #1b1b18; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 700; font-size: 0.85rem; }
+.aba.ativa { background: var(--vermelho); border-color: var(--vermelho); color: #fff; }
 .fab { position: fixed; left: 14px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 30; background: var(--vermelho); color: #fff; border: 0; border-radius: 10px; padding: 16px; font: inherit; font-weight: 800; font-size: 1.05rem; box-shadow: 0 6px 18px rgba(217,48,53,0.45); }
 .fab:active { background: var(--vermelho-esc); }
 
