@@ -5,5 +5,5 @@ var supabaseClient = window.supabase.createClient(
 );
 
 function usernameToEmail(username) {
-  return username.trim().toLowerCase().replace(/\s+/g, '.') + ADMIN_CONFIG.syntheticEmailDomain;
+  return username.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '.').replace(/[^a-z0-9._-]/g, '') + ADMIN_CONFIG.syntheticEmailDomain;
 }

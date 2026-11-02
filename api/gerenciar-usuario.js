@@ -7,7 +7,7 @@ var SUPABASE_ANON_KEY = 'sb_publishable_KymWyWGjso1Y2EmZ9WbyfQ_ou9_M8QJ';
 var SYNTHETIC_DOMAIN = '@oficinadasbalancas.internal';
 
 function usernameToEmail(username) {
-  return username.trim().toLowerCase().replace(/\s+/g, '.') + SYNTHETIC_DOMAIN;
+  return username.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '.').replace(/[^a-z0-9._-]/g, '') + SYNTHETIC_DOMAIN;
 }
 
 async function usuarioEhAdmin(accessToken) {
