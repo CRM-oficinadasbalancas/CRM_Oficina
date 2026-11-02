@@ -50,7 +50,7 @@ function desenharAbasPipeline() {
   var emAviso = function (c) { return revisitaEmAviso(calcularProximoRetorno(c, pipelineHistoricoPorCliente[c.id] || [])); };
   var abas = [
     { v: 'ativo', t: 'Em acompanhamento', n: contar(function (c) { return c.situacao === 'ativo' || (c.situacao === 'ganho' && emAviso(c)); }) },
-    { v: 'fechado', t: 'Fechados (ganhos + perdidos)', n: contar(function (c) { return c.situacao === 'ganho' || c.situacao === 'perdido'; }) },
+    { v: 'fechado', t: 'Fechados', n: contar(function (c) { return c.situacao === 'ganho' || c.situacao === 'perdido'; }) },
     { v: 'ganho', t: 'Ganhos', n: contar(function (c) { return c.situacao === 'ganho'; }) },
     { v: 'perdido', t: 'Perdidos', n: contar(function (c) { return c.situacao === 'perdido'; }) },
     { v: '', t: 'Todos', n: pipelineClientes.length }
