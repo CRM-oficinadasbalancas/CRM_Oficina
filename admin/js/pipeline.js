@@ -43,11 +43,15 @@ function desenharAbasPipeline() {
     barra.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;';
     campo.parentNode.insertBefore(barra, campo);
   }
+  if (!select.querySelector('option[value="fechado"]')) {
+    var op = document.createElement('option'); op.value = 'fechado'; op.textContent = 'Fechados'; select.appendChild(op);
+  }
   var contar = function (fn) { return pipelineClientes.filter(fn).length; };
   var emAviso = function (c) { return revisitaEmAviso(calcularProximoRetorno(c, pipelineHistoricoPorCliente[c.id] || [])); };
   var abas = [
     { v: 'ativo', t: 'Em acompanhamento', n: contar(function (c) { return c.situacao === 'ativo' || (c.situacao === 'ganho' && emAviso(c)); }) },
-    { v: 'ganho', t: 'Fechados (ganhos)', n: contar(function (c) { return c.situacao === 'ganho'; }) },
+    { v: 'fechado', t: 'Fechados (ganhos + perdidos)', n: contar(function (c) { return c.situacao === 'ganho' || c.situacao === 'perdido'; }) },
+    { v: 'ganho', t: 'Ganhos', n: contar(function (c) { return c.situacao === 'ganho'; }) },
     { v: 'perdido', t: 'Perdidos', n: contar(function (c) { return c.situacao === 'perdido'; }) },
     { v: '', t: 'Todos', n: pipelineClientes.length }
   ];
@@ -73,6 +77,7 @@ function renderPipelineTable() {
   // Em "Ativos" entram também os Ganhos de Manutenção que têm revisão preventiva a fazer.
   var visiveis = pipelineClientes.filter(function (c) {
     if (!filtro || c.situacao === filtro) return true;
+    if (filtro === 'fechado') return c.situacao === 'ganho' || c.situacao === 'perdido';
     if (filtro !== 'ativo' || c.situacao !== 'ganho') return false;
     return revisitaEmAviso(calcularProximoRetorno(c, pipelineHistoricoPorCliente[c.id] || []));
   });
