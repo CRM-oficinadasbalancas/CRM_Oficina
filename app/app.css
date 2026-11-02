@@ -54,6 +54,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--vermelho); 
   border-bottom: 2px solid var(--vermelho);
 }
 .topo-logo { height: 32px; width: auto; }
+.topo-sair { margin-left: auto; }
 .topo-sair, .topo-voltar { background: none; border: 1px solid #fff; color: #fff; font: inherit; font-weight: 700; font-size: 0.9rem; padding: 7px 14px; border-radius: 6px; }
 .topo-voltar { border: 0; padding-left: 0; font-size: 1rem; }
 .topo strong { font-size: 1rem; }

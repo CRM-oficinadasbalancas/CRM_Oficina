@@ -105,8 +105,15 @@ function desenharAbas() {
   });
 }
 
-async function carregarAgenda() {
-  $('agenda').innerHTML = '<p class="vazio">Carregando...</p>';
+// Assinatura da lista (para saber se algo mudou e evitar redesenhar à toa na atualização automática).
+function assinaturaLista(lista) {
+  return lista.map(function (c) { return [c.id, c.status, c.tecnico_id, c.data_agendada].join(':'); }).join('|');
+}
+
+// silencioso = atualização automática: não mostra "Carregando", não mexe na tela se nada mudou.
+async function carregarAgenda(silencioso) {
+  silencioso = silencioso === true;
+  if (!silencioso) $('agenda').innerHTML = '<p class="vazio">Carregando...</p>';
   var papel = estado.perfil.role;
   var aba = estado.aba || 'abertos';
   desenharAbas();
@@ -125,11 +132,20 @@ async function carregarAgenda() {
   }
   var fechados = ABAS[papel] && aba === 'fechados';
   var r = fechados ? await q.order('fechado_em', { ascending: false, nullsFirst: false }).limit(100) : await q.order('created_at', { ascending: true }).limit(500);
-  if (r.error) { $('agenda').innerHTML = '<p class="vazio">Não foi possível carregar. Verifique a internet e toque em Atualizar.</p>'; return; }
-  estado.chamados = r.data || [];
-  estado.rota = null;
-  $('rota-info').textContent = ''; $('rota-mapa').hidden = true;
+  if (r.error) { if (!silencioso) $('agenda').innerHTML = '<p class="vazio">Não foi possível carregar. Verifique a internet; a lista se atualiza sozinha.</p>'; return; }
+  var novos = r.data || [];
+  if (silencioso && assinaturaLista(novos) === assinaturaLista(estado.chamados)) return;
+  estado.chamados = novos;
   desenharAgenda();
+  otimizarRotaAuto();
+}
+
+// Atualização automática: ao abrir, a cada 30 s e quando o app volta para a tela (sem mexer num formulário aberto).
+setInterval(function () { atualizarSozinho(); }, 30000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) atualizarSozinho(); });
+function atualizarSozinho() {
+  if (document.hidden || !estado.perfil || $('view-agenda').hidden) return;
+  carregarAgenda(true);
 }
 
 function cartao(c, ordem) {
@@ -173,7 +189,15 @@ function desenharAgenda() {
     var atrasados = campo.filter(function (c) { return c.data_agendada && c.data_agendada < hoje; });
     var deHoje = campo.filter(function (c) { return !c.data_agendada || c.data_agendada === hoje; });
     var proximos = campo.filter(function (c) { return c.data_agendada && c.data_agendada > hoje; });
-    if (estado.rota) deHoje = estado.rota.ordem; // ordem otimizada
+    if (estado.rota) { // ordem otimizada, com os dados mais recentes de cada chamado
+      var porId = {};
+      campo.forEach(function (c) { porId[c.id] = c; });
+      var novosHoje = deHoje;
+      deHoje = estado.rota.ordem.map(function (c) { return porId[c.id]; }).filter(Boolean);
+      var emRota = {};
+      deHoje.forEach(function (c) { emRota[c.id] = true; });
+      deHoje = deHoje.concat(novosHoje.filter(function (c) { return !emRota[c.id]; }));
+    }
     html += secao('Atrasados', atrasados, false);
     html += secao(estado.rota ? 'Hoje — rota otimizada' : 'Hoje (mais antigos primeiro)', deHoje, !!estado.rota);
     html += secao('Próximos dias', proximos, false);
@@ -189,7 +213,6 @@ function desenharAgenda() {
   $('agenda').querySelectorAll('.card').forEach(function (b) { b.addEventListener('click', function () { abrirChamado(b.dataset.id); }); });
 }
 
-$('btn-atualizar').addEventListener('click', carregarAgenda);
 
 /* ===================== ROTA ===================== */
 
@@ -229,31 +252,42 @@ async function localizarFaltantes(lista) {
   }
 }
 
-$('btn-rota').addEventListener('click', async function () {
-  var btn = this; btn.disabled = true;
-  $('rota-info').textContent = 'Calculando a melhor rota...';
-  $('rota-mapa').hidden = true;
+// Rota otimizada automática: ao abrir (e quando a lista de hoje mudar), a partir da posição do técnico
+// (ou da oficina, se o GPS não estiver liberado).
+async function otimizarRotaAuto() {
+  var papel = estado.perfil.role;
+  if (papel === 'oficina_interna' || estado.calculandoRota) return;
+  if (ABAS[papel] && (estado.aba || 'abertos') !== 'abertos') return;
   var hoje = hojeISO();
   var doDia = chPorAbertura(estado.chamados.filter(function (c) { return c.tipo === 'campo' && (!c.data_agendada || c.data_agendada === hoje); }));
-  if (doDia.length < 2) { $('rota-info').textContent = 'Precisa de pelo menos 2 chamados no dia para otimizar.'; btn.disabled = false; return; }
+  if (doDia.length < 2) { estado.rota = null; estado.rotaAssin = ''; $('rota-info').textContent = ''; $('rota-mapa').hidden = true; $('bloco-rota').hidden = true; return; }
+  var assin = doDia.map(function (c) { return c.id; }).join(',');
+  if (estado.rota && estado.rotaAssin === assin) return;
 
-  await localizarFaltantes(doDia);
-  var origem = await origemDaRota();
-  var pontos = doDia.map(function (c) { var cl = c.clientes || {}; return { id: c.id, lat: cl.latitude, lng: cl.longitude, chamado: c }; });
-  var res = chOtimizarRota(origem, pontos);
+  estado.calculandoRota = true;
+  try {
+    $('rota-info').textContent = 'Calculando a melhor rota...';
+    $('rota-mapa').hidden = true;
+    await localizarFaltantes(doDia);
+    var origem = await origemDaRota();
+    var pontos = doDia.map(function (c) { var cl = c.clientes || {}; return { id: c.id, lat: cl.latitude, lng: cl.longitude, chamado: c }; });
+    var res = chOtimizarRota(origem, pontos);
 
-  var dist = {}, anterior = origem;
-  res.ordem.forEach(function (p) {
-    if (p.lat != null && p.lng != null) { dist[p.id] = chKm(anterior, p); anterior = p; }
-  });
-  estado.rota = { ordem: res.ordem.map(function (p) { return p.chamado; }), dist: dist };
-  var url = chUrlRota(origem, res.ordem.filter(function (p) { return p.lat != null; }));
-  desenharAgenda();
-  $('rota-info').textContent = 'Saindo ' + (origem.gps ? 'da sua posição' : 'da oficina') + ': cerca de ' + res.kmEstimado.toFixed(0) + ' km de estrada em ' + (doDia.length - res.semLocalizacao) + ' paradas.' +
-    (res.semLocalizacao ? ' ' + res.semLocalizacao + ' sem endereço localizado (ficam no fim).' : '');
-  if (url) { $('rota-mapa').href = url; $('rota-mapa').hidden = false; }
-  btn.disabled = false;
-});
+    var dist = {}, anterior = origem;
+    res.ordem.forEach(function (p) {
+      if (p.lat != null && p.lng != null) { dist[p.id] = chKm(anterior, p); anterior = p; }
+    });
+    estado.rota = { ordem: res.ordem.map(function (p) { return p.chamado; }), dist: dist };
+    estado.rotaAssin = assin;
+    var url = chUrlRota(origem, res.ordem.filter(function (p) { return p.lat != null; }));
+    desenharAgenda();
+    $('rota-info').textContent = 'Rota de hoje otimizada, saindo ' + (origem.gps ? 'da sua posição' : 'da oficina') + ': cerca de ' + res.kmEstimado.toFixed(0) + ' km de estrada em ' + (doDia.length - res.semLocalizacao) + ' paradas.' +
+      (res.semLocalizacao ? ' ' + res.semLocalizacao + ' sem endereço localizado (ficam no fim).' : '');
+    if (url) { $('rota-mapa').href = url; $('rota-mapa').hidden = false; }
+  } finally {
+    estado.calculandoRota = false;
+  }
+}
 
 /* ===================== CHAMADO ===================== */
 
