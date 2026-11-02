@@ -19,6 +19,8 @@ var FILTROS = [
   { id: 'campo', rotulo: 'Campo', fn: function (c) { return c.tipo === 'campo' && ['aberta', 'em_andamento'].indexOf(c.status) !== -1; } },
   { id: 'orcamento', rotulo: 'Aguardando orçamento', fn: function (c) { return c.status === 'pendente'; } },
   { id: 'aprovados', rotulo: 'Orçamento aprovado', fn: function (c) { return c.status === 'orcamento_aprovado'; } },
+  { id: 'faturar', rotulo: 'A faturar', fn: chAFaturar },
+  { id: 'faturados', rotulo: 'Faturados', fn: function (c) { return !!c.faturado_em; } },
   { id: 'oficina', rotulo: 'Oficina interna', fn: function (c) { return c.tipo === 'oficina' && ['orcamento_aprovado', 'em_andamento'].indexOf(c.status) !== -1; } },
   { id: 'fechados', rotulo: 'Fechados', fn: function (c) { return c.status === 'concluida'; } },
   { id: 'recusados', rotulo: 'Recusados', fn: function (c) { return c.status === 'nao_aprovada'; } },
@@ -75,7 +77,8 @@ function desenharLista() {
     var agenda = c.tipo === 'campo' ? esc(nomeTecnico(c.tecnico_id)) + (c.data_agendada ? '<br><small>' + fmtDia(c.data_agendada) + '</small>' : '') : '<span class="tipo-tag">Oficina interna</span>' + (c.tecnico_id ? '<br><small>' + esc(nomeTecnico(c.tecnico_id)) + '</small>' : '');
     return '<tr class="ch-linha" data-id="' + c.id + '"><td><b>' + c.numero + '</b></td><td>' + fmtData(c.created_at) + '</td><td>' + esc(c.clientes ? c.clientes.razao_social : '—') +
       '</td><td>' + esc(equipTxt(c)) + '</td><td>' + esc((c.descricao_defeito || '').slice(0, 90)) + '</td><td>' + agenda +
-      '</td><td><span class="ch-st st-' + c.status + '">' + CH_STATUS_CURTO[c.status] + '</span></td></tr>';
+      '</td><td><span class="ch-st st-' + c.status + '">' + CH_STATUS_CURTO[c.status] + '</span>' +
+      (chAFaturar(c) ? '<br><small style="color:#b4251f; font-weight:700;">A faturar</small>' : (c.faturado_em ? '<br><small>Faturado ' + fmtData(c.faturado_em) + '</small>' : '')) + '</td></tr>';
   }).join('');
   $('ch-tbody').querySelectorAll('.ch-linha').forEach(function (tr) {
     tr.addEventListener('click', function () { abrirDetalhe(tr.dataset.id); });
@@ -242,13 +245,14 @@ function desenharDetalhe() {
     '<div><b>Endereço</b>' + (end ? esc(end) + (mapa ? ' <a href="' + mapa + '" target="_blank" rel="noopener" style="color:#d93035;">mapa</a>' : '') : '—') + '</div>' +
     '<div><b>Equipamento</b>' + esc(equipTxt(c)) + '</div>' +
     '<div><b>Abertura</b>' + fmtData(c.created_at) + '</div>' +
+    (c.status === 'concluida' && c.orcamento_em ? '<div><b>Faturamento</b>' + (c.faturado_em ? 'Faturado em ' + fmtData(c.faturado_em) : '<span style="color:#b4251f; font-weight:700;">A faturar (recepção)</span>') + '</div>' : '') +
     '<div><b>Técnico / visita</b>' + (c.tecnico_id ? esc(nomeTecnico(c.tecnico_id)) + (c.tipo === 'campo' ? ' · ' + fmtDia(c.data_agendada) : '') : '—') + '</div>' +
     '<div style="grid-column:1/-1;"><b>Defeito</b>' + esc(c.descricao_defeito) + '</div>' +
     '<div><b>Selo antigo</b>' + (c.selo_antigo_ausente ? 'Não possui' : esc(c.selo_antigo || '—')) + '</div>' +
     '<div><b>Selo novo</b>' + esc(c.selo_novo || '—') + '</div>' +
     '<div><b>Lacre antigo</b>' + (c.lacre_antigo_ausente ? 'Não possui' : esc(c.lacre_antigo || '—')) + '</div>' +
     '<div><b>Lacre novo</b>' + esc(c.lacre_novo || '—') + '</div>';
-  var rot = { iniciar: 'Iniciar', pendencia: 'Pendência / enviar para oficina', fechar: 'Fechar chamado', aprovar: 'Orçamento aprovado', recusar: 'Orçamento recusado', agendar: 'Reprogramar', anotar: 'Adicionar anotação' };
+  var rot = { iniciar: 'Iniciar', pendencia: 'Pendência / enviar para oficina', fechar: 'Fechar chamado', aprovar: 'Orçamento aprovado', recusar: 'Orçamento recusado', agendar: 'Reprogramar', anotar: 'Adicionar anotação', faturar: 'Marcar como faturado' };
   var acoes = chAcoes(papel, c);
   $('d-acoes').innerHTML = acoes.map(function (a) {
     return '<button type="button" class="btn ' + (a === 'recusar' || a === 'anotar' ? 'btn-outline' : 'btn-primary') + '" data-a="' + a + '">' + rot[a] + '</button>';
@@ -315,6 +319,10 @@ async function painelAcao(acao) {
       '</select></div><div class="form-field"><label for="a-qtd">Quantidade usada</label><input type="text" id="a-qtd" maxlength="8" placeholder="Ex: 1"></div></div>' + erroEl + btnOk + '</div>';
     ligarFlags();
     $('a-ok').onclick = function () { var v = lerVedacao(); v.historico = $('a-hist').value; v.pecaId = $('a-peca').value; v.qtd = $('a-qtd').value; executar(function () { return chFechar(c, meuId, v); }); };
+  } else if (acao === 'faturar') {
+    p.innerHTML = '<div class="ch-painel"><p>Confirma que o serviço deste chamado foi <b>faturado</b>?</p>' +
+      '<div class="form-field"><label for="a-nota">Observação (opcional) — nº da nota, pedido ou forma de cobrança</label><textarea id="a-nota" rows="2" maxlength="500"></textarea></div>' + erroEl + btnOk + '</div>';
+    $('a-ok').onclick = function () { executar(function () { return chFaturar(c, meuId, $('a-nota').value); }); };
   } else if (acao === 'anotar') {
     p.innerHTML = '<div class="ch-painel"><div class="form-field"><label for="a-nota">Anotação * — diagnóstico, observação ou andamento</label><textarea id="a-nota" rows="3" maxlength="5000"></textarea></div>' + erroEl + btnOk + '</div>';
     $('a-ok').onclick = function () { executar(function () { return chAnotar(c, meuId, $('a-nota').value); }); };

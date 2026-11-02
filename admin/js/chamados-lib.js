@@ -48,6 +48,8 @@ function chAcoes(papel, c) {
     if (s === 'pendente') a.push('aprovar', 'recusar');
   }
   if ((admin || papel === 'programadora') && c.tipo === 'campo' && (s === 'aberta' || s === 'em_andamento')) a.push('agendar');
+  // faturamento: serviço fechado que passou por orçamento aprovado volta para a recepção faturar
+  if ((admin || papel === 'recepcao') && chAFaturar(c)) a.push('faturar');
   // anotação no histórico (diagnóstico, observação): qualquer perfil do chamado, enquanto ele não está encerrado
   if (admin || ((papel === 'tecnico' || papel === 'oficina_interna' || papel === 'programadora' || papel === 'recepcao') && s !== 'concluida' && s !== 'nao_aprovada')) a.push('anotar');
   return a.filter(function (x, i) { return a.indexOf(x) === i; });
@@ -63,6 +65,17 @@ async function chAtualizar(c, campos, autorId, tipoHist, texto) {
   var r = await supabaseClient.from('assistencias_tecnicas').update(campos).eq('id', c.id).select().single();
   if (r.error) return { erro: r.error.message };
   if (texto) await chHistorico(c.id, autorId, tipoHist, campos.status, texto);
+  return { chamado: r.data };
+}
+
+// Chamado fechado que passou por orçamento aprovado e ainda não foi faturado.
+function chAFaturar(c) { return c.status === 'concluida' && !!c.orcamento_em && !c.faturado_em; }
+
+async function chFaturar(c, autorId, texto) {
+  texto = (texto || '').trim();
+  var r = await supabaseClient.from('assistencias_tecnicas').update({ faturado_em: new Date().toISOString() }).eq('id', c.id).select().single();
+  if (r.error) return { erro: r.error.message };
+  await chHistorico(c.id, autorId, 'nota', r.data.status, 'Serviço faturado.' + (texto ? ' ' + texto : ''));
   return { chamado: r.data };
 }
 
@@ -207,4 +220,4 @@ function chPorAbertura(lista) {
   return lista.slice().sort(function (a, b) { return new Date(a.created_at) - new Date(b.created_at); });
 }
 
-if (typeof module !== 'undefined') module.exports = { chOtimizarRota: chOtimizarRota, chKm: chKm, chUrlRota: chUrlRota, chAcoes: chAcoes, chPorAbertura: chPorAbertura, chCamposVedacao: chCamposVedacao };
+if (typeof module !== 'undefined') module.exports = { chAFaturar: chAFaturar, chOtimizarRota: chOtimizarRota, chKm: chKm, chUrlRota: chUrlRota, chAcoes: chAcoes, chPorAbertura: chPorAbertura, chCamposVedacao: chCamposVedacao };
