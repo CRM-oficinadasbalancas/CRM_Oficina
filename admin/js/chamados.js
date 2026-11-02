@@ -372,6 +372,13 @@ async function executar(fn) {
 }
 
 $('d-fechar').addEventListener('click', function () { $('modal-det').classList.remove('open'); });
+// X no canto superior direito e tecla Esc fecham a janela aberta
+document.querySelectorAll('.modal-x').forEach(function (b) {
+  b.addEventListener('click', function () { b.closest('.modal-overlay').classList.remove('open'); });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(function (m) { m.classList.remove('open'); });
+});
 $('ch-busca').addEventListener('input', function () { busca = this.value; desenharLista(); });
 $('btn-novo').addEventListener('click', abrirNovo);
 

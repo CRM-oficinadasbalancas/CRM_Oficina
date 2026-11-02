@@ -411,6 +411,24 @@ body.admin-body {
   max-height: 90vh;
   overflow-y: auto;
 }
+/* botão X no canto superior direito (fica visível ao rolar a janela) */
+.modal-x {
+  position: sticky;
+  top: 0;
+  float: right;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  margin: -10px -10px 0 10px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f1ee;
+  color: #1b1b18;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.modal-x:hover { background: #d93035; color: #fff; }
 .modal-box h3 {
   font-family: var(--font-heading);
   font-weight: 700;
