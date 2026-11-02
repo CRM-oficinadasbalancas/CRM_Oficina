@@ -13,9 +13,10 @@
 //     contando os "negativo" acumulados pra saber em qual das 3 etapas está.
 //   - sem resultado marcado ainda → precisa definir (prioridade máxima).
 //
-// Revisão preventiva: lead de Manutenção que já fechou (situação Ganho, com ao menos um
-// contato "Fechou o serviço") continua na cadência acima: 60 dias após o fechamento volta
-// como "Revisão". A situação Ganho (e a taxa de fechamento) não muda.
+// Revisita: lead de Manutenção que já fechou (situação Ganho, com ao menos um contato
+// "Fechou o serviço") volta como "Revisão" 180 dias (semestral) depois do último contato
+// positivo, e se repete a cada novo contato positivo. Contato negativo: cadência 24/72/120h
+// (contados desde o último positivo). A situação Ganho (e a taxa de fechamento) não muda.
 //
 // Pós-venda: sem histórico ainda → 30 dias pro 1º retorno. Depois:
 //   - "positivo" → resolvido, não agenda mais nada.
@@ -23,12 +24,23 @@
 //   - sem resultado → precisa definir (prioridade máxima).
 
 var HORAS_VENDAS = [24, 72, 120];
+// Revisita de quem já fechou em Manutenção (semestral, se repete a cada contato positivo).
+var REVISITA_DIAS = 180;
+// A revisita só entra nas listas de trabalho quando falta até isso (dias) pra vencer.
+var REVISITA_AVISO_DIAS = 30;
 
 function addHoras(data, horas) {
   return new Date(data.getTime() + horas * 60 * 60 * 1000);
 }
 function addDias(data, dias) {
   return new Date(data.getTime() + dias * 24 * 60 * 60 * 1000);
+}
+
+// Revisita que merece aparecer nas listas de trabalho (vence em até REVISITA_AVISO_DIAS ou precisa de contato).
+function revisitaEmAviso(retorno) {
+  if (!retorno.revisao || retorno.concluido) return false;
+  if (retorno.prioridadeMaxima) return true;
+  return !!retorno.data && retorno.data.getTime() <= Date.now() + REVISITA_AVISO_DIAS * 86400000;
 }
 
 function marcarRevisao(retorno, revisao) {
@@ -74,6 +86,19 @@ function calcularProximoRetorno(cliente, historico) {
     var ultimaM = historico[historico.length - 1];
     if (!ultimaM.resultado) {
       return marcarRevisao({ data: null, prioridadeMaxima: true, concluido: false }, revisao);
+    }
+    if (revisao) {
+      var idxPos = -1;
+      historico.forEach(function (h, i) { if (h.resultado === 'positivo') idxPos = i; });
+      if (ultimaM.resultado === 'positivo') {
+        return marcarRevisao({ data: addDias(new Date(ultimaM.created_at), REVISITA_DIAS), prioridadeMaxima: false, concluido: false }, true);
+      }
+      var negRev = historico.slice(idxPos + 1).filter(function (h) { return h.resultado === 'negativo'; }).length;
+      if (negRev > HORAS_VENDAS.length) {
+        // 3 tentativas sem sucesso: tenta de novo só no próximo semestre
+        return marcarRevisao({ data: addDias(new Date(ultimaM.created_at), REVISITA_DIAS), prioridadeMaxima: false, concluido: false }, true);
+      }
+      return marcarRevisao({ data: addHoras(new Date(ultimaM.created_at), HORAS_VENDAS[Math.min(negRev - 1, HORAS_VENDAS.length - 1)]), prioridadeMaxima: false, concluido: false }, true);
     }
     if (ultimaM.resultado === 'positivo') {
       var fechados = historico.filter(function (h) { return h.resultado === 'positivo'; });

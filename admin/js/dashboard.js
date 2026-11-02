@@ -60,7 +60,7 @@ async function buscarTodosClientes() {
   for (var inicio = 0; ; inicio += passo) {
     var { data, error } = await supabaseClient
       .from('clientes')
-      .select('categoria, situacao, canal_aquisicao, created_at, eh_cliente, encerrado_em, encerrado_por_nome')
+      .select('id, razao_social, categoria, situacao, canal_aquisicao, created_at, eh_cliente, encerrado_em, encerrado_por_nome')
       .range(inicio, inicio + passo - 1);
     if (error) throw error;
     todos = todos.concat(data || []);
@@ -82,6 +82,37 @@ function contar(lista, chaveFn) {
 }
 
 var clientesEfetividade = [];
+
+// Lista visível dos fechamentos mais recentes, com a próxima revisita (manutenção ganha).
+async function desenharUltimosFechamentos() {
+  var tbody = document.getElementById('fech-tbody');
+  if (!tbody) return;
+  var recentes = clientesEfetividade.filter(function (c) {
+    return (c.situacao === 'ganho' || c.situacao === 'perdido') && c.encerrado_em;
+  }).sort(function (a, b) { return new Date(b.encerrado_em) - new Date(a.encerrado_em); }).slice(0, 15);
+  if (!recentes.length) {
+    tbody.innerHTML = '<tr><td colspan="6">Nenhum fechamento registrado ainda. Feche um lead pela ficha do cliente (histórico com status Fechado).</td></tr>';
+    return;
+  }
+  var h = await supabaseClient.from('cliente_historico').select('cliente_id, created_at, resultado')
+    .in('cliente_id', recentes.map(function (c) { return c.id; })).order('created_at', { ascending: true });
+  var historico = {};
+  (h.data || []).forEach(function (x) { (historico[x.cliente_id] = historico[x.cliente_id] || []).push(x); });
+  var funis = { venda: 'Vendas', manutencao: 'Manutenção', pos_venda: 'Pós-venda' };
+  tbody.innerHTML = recentes.map(function (c) {
+    var revisita = '—';
+    if (c.situacao === 'ganho') {
+      var r = calcularProximoRetorno(c, historico[c.id] || []);
+      if (r.revisao && !r.concluido) {
+        revisita = r.data ? r.data.toLocaleDateString('pt-BR') : 'Precisa de contato';
+      }
+    }
+    return '<tr><td>' + linkCliente(c) + '</td><td>' + (funis[c.categoria] || '—') + '</td>' +
+      '<td><span class="badge ' + (c.situacao === 'ganho' ? 'badge-ok' : 'badge-danger') + '">' + (c.situacao === 'ganho' ? 'Ganho' : 'Perdido') + '</span></td>' +
+      '<td>' + new Date(c.encerrado_em).toLocaleDateString('pt-BR') + '</td><td>' + escHtml(c.encerrado_por_nome || '—') + '</td><td>' + revisita + '</td></tr>';
+  }).join('');
+  ligarLinksCliente(tbody);
+}
 
 // Efetividade de fechamento: ganhos ÷ (ganhos + perdidos), por quem fechou e por mês do fechamento.
 function desenharEfetividade() {
@@ -149,6 +180,7 @@ async function carregarEstatisticas() {
   var encerrados = ganhos + perdidos;
   clientesEfetividade = clientes;
   desenharEfetividade();
+  desenharUltimosFechamentos();
 
   document.getElementById('kpi-ativos').textContent = ativos;
   document.getElementById('kpi-ganhos').textContent = ganhos;
@@ -273,8 +305,7 @@ async function carregarQuadrante(quadrante) {
   clientes = (clientes || []).filter(function (c) {
     // Ganho de Manutenção só aparece quando há revisão preventiva a fazer.
     if (c.situacao !== 'ganho') return true;
-    var r = calcularProximoRetorno(c, c.cliente_historico || []);
-    return r.revisao && !r.concluido;
+    return revisitaEmAviso(calcularProximoRetorno(c, c.cliente_historico || []));
   });
 
   document.getElementById('quad-count-' + quadrante.categoria).textContent = clientes.length;

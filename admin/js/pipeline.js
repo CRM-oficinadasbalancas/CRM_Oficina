@@ -31,15 +31,50 @@ async function loadPipeline() {
   renderPipelineTable();
 }
 
+// Abas "Em acompanhamento / Fechados (ganhos) / Perdidos / Todos" com contagem, no lugar do seletor escondido.
+function desenharAbasPipeline() {
+  var select = document.getElementById('pipeline-filtro-situacao');
+  var campo = select.closest('.form-field');
+  var barra = document.getElementById('pipeline-abas');
+  if (!barra) {
+    campo.style.display = 'none';
+    barra = document.createElement('div');
+    barra.id = 'pipeline-abas';
+    barra.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;';
+    campo.parentNode.insertBefore(barra, campo);
+  }
+  var contar = function (fn) { return pipelineClientes.filter(fn).length; };
+  var emAviso = function (c) { return revisitaEmAviso(calcularProximoRetorno(c, pipelineHistoricoPorCliente[c.id] || [])); };
+  var abas = [
+    { v: 'ativo', t: 'Em acompanhamento', n: contar(function (c) { return c.situacao === 'ativo' || (c.situacao === 'ganho' && emAviso(c)); }) },
+    { v: 'ganho', t: 'Fechados (ganhos)', n: contar(function (c) { return c.situacao === 'ganho'; }) },
+    { v: 'perdido', t: 'Perdidos', n: contar(function (c) { return c.situacao === 'perdido'; }) },
+    { v: '', t: 'Todos', n: pipelineClientes.length }
+  ];
+  barra.innerHTML = abas.map(function (a) {
+    var ativa = select.value === a.v;
+    return '<button type="button" data-aba="' + a.v + '" class="btn ' + (ativa ? 'btn-primary' : 'btn-outline') + '">' + a.t + ' <b>' + a.n + '</b></button>';
+  }).join('');
+  barra.querySelectorAll('[data-aba]').forEach(function (b) {
+    b.addEventListener('click', function () { select.value = b.dataset.aba; renderPipelineTable(); });
+  });
+}
+
+function textoFechamento(c) {
+  if (c.situacao !== 'ganho' && c.situacao !== 'perdido') return '';
+  var quando = c.encerrado_em ? new Date(c.encerrado_em).toLocaleDateString('pt-BR') : 'data não registrada';
+  return '<br><small>' + (c.situacao === 'ganho' ? 'Fechado em ' : 'Perdido em ') + quando + (c.encerrado_por_nome ? ' · ' + escHtml(c.encerrado_por_nome) : '') + '</small>';
+}
+
 function renderPipelineTable() {
+  desenharAbasPipeline();
   var tbody = document.getElementById('pipeline-tbody');
   var filtro = document.getElementById('pipeline-filtro-situacao').value;
   // Em "Ativos" entram também os Ganhos de Manutenção que têm revisão preventiva a fazer.
   var visiveis = pipelineClientes.filter(function (c) {
     if (!filtro || c.situacao === filtro) return true;
     if (filtro !== 'ativo' || c.situacao !== 'ganho') return false;
-    var r = calcularProximoRetorno(c, pipelineHistoricoPorCliente[c.id] || []);
-    return r.revisao && !r.concluido;
+    return revisitaEmAviso(calcularProximoRetorno(c, pipelineHistoricoPorCliente[c.id] || []));
   });
   if (!visiveis.length) {
     tbody.innerHTML = '<tr><td colspan="7">Nenhum cliente neste filtro em ' + PIPELINE_LABEL + '.</td></tr>';
@@ -70,13 +105,13 @@ function renderPipelineTable() {
     var contato = [c.telefone_empresa, c.email_empresa].filter(Boolean).join(' — ') || '—';
     var prazo = formatarPrazo(item.retorno);
     var badgePrazo = prazo.classe ? '<span class="badge ' + prazo.classe + '">' + prazo.texto + '</span>' : prazo.texto;
-    var classeLinha = ((c.situacao === 'ativo' || item.retorno.revisao) && !item.retorno.concluido) ? ' class="row-' + classificarUrgencia(item.retorno) + '"' : '';
+    var classeLinha = ((c.situacao === 'ativo' || revisitaEmAviso(item.retorno)) && !item.retorno.concluido) ? ' class="row-' + classificarUrgencia(item.retorno) + '"' : '';
     return '<tr' + classeLinha + '>' +
       '<td><button type="button" class="link-cliente" data-abrir="' + c.id + '">' + escHtml(c.razao_social || '') + '</button></td>' +
       '<td>' + contato + '</td>' +
       '<td>' + (c.canal_aquisicao || '—') + '</td>' +
       '<td>' + badgePrazo + '</td>' +
-      '<td><select data-situacao="' + c.id + '">' + opcoesSituacaoHtml(c.situacao) + '</select></td>' +
+      '<td><select data-situacao="' + c.id + '">' + opcoesSituacaoHtml(c.situacao) + '</select>' + textoFechamento(c) + '</td>' +
       '<td><select data-mover="' + c.id + '">' + opcoesCategoria.replace(
         'value="' + PIPELINE_CATEGORIA + '"', 'value="' + PIPELINE_CATEGORIA + '" selected'
       ) + '</select></td>' +
