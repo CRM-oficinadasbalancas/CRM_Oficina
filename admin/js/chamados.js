@@ -42,6 +42,10 @@ var FILTROS_POR_PAPEL = {
     { id: 'fechados', rotulo: 'Fechados', fn: function (c) { return c.status === 'concluida'; } }
   ]
 };
+// Recepção: só as abas do trabalho dela, nesta ordem.
+FILTROS_POR_PAPEL.recepcao = ['abertos', 'orcamento', 'faturar', 'oficina', 'fechados', 'recusados'].map(function (id) {
+  return FILTROS.find(function (f) { return f.id === id; });
+});
 function filtrosAtivos() { return FILTROS_POR_PAPEL[papel] || FILTROS; }
 
 /* ===================== LISTA ===================== */

@@ -10,6 +10,7 @@ var MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho'
 var abaAtual = 'consumo';
 var chamadosPeriodo = [];   // abertos no período (todos os status)
 var chamadosEmAberto = [];  // backlog: abertos hoje, qualquer data
+var chamadosOficinaAno = [];  // chamados da oficina com algum evento (abertura, orçamento, faturamento) no ano
 var pecasEstoque = [];      // todas as peças e o saldo de hoje
 var carregou = false;
 
@@ -56,12 +57,20 @@ async function carregar() {
       .order('created_at', { ascending: false }).limit(5000),
     supabaseClient.from('assistencias_tecnicas').select(SELECT_CHAMADO)
       .in('status', STATUS_ABERTOS).order('created_at', { ascending: true }).limit(5000),
-    supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade').order('codigo').limit(5000)
+    supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade').order('codigo').limit(5000),
+    (function () {
+      var ano = parseInt($('f-ano').value, 10);
+      var a = new Date(ano, 0, 1).toISOString(), b = new Date(ano + 1, 0, 1).toISOString();
+      return supabaseClient.from('assistencias_tecnicas').select(SELECT_CHAMADO).eq('tipo', 'oficina')
+        .or('and(created_at.gte.' + a + ',created_at.lt.' + b + '),and(orcamento_em.gte.' + a + ',orcamento_em.lt.' + b + '),and(faturado_em.gte.' + a + ',faturado_em.lt.' + b + ')')
+        .limit(5000);
+    })()
   ]);
-  if (res[0].error || res[1].error) {
-    $('painel').innerHTML = '<p class="rel-nota">Não foi possível carregar: ' + esc((res[0].error || res[1].error).message) + '</p>';
+  if (res[0].error || res[1].error || res[3].error) {
+    $('painel').innerHTML = '<p class="rel-nota">Não foi possível carregar: ' + esc((res[0].error || res[1].error || res[3].error).message) + '</p>';
     return;
   }
+  chamadosOficinaAno = res[3].data || [];
   chamadosPeriodo = res[0].data || [];
   chamadosEmAberto = res[1].data || [];
   pecasEstoque = res[2].data || [];
@@ -151,6 +160,82 @@ function abaConsumo() {
     tabela([{ t: 'Código' }, { t: 'Peça' }, { t: 'Consumido no período', num: true }, { t: 'Chamados', num: true }, { t: 'Estoque atual', num: true }, { t: 'Estoque dura', num: true }], linhas,
       'Nenhuma peça cadastrada no estoque.') +
     '<p class="rel-nota" style="margin-top:10px;">"Estoque dura" estima por quantos meses o saldo atual cobre o consumo médio mensal do período escolhido. Chamados com orçamento recusado não entram (a peça não foi usada).</p>';
+}
+
+/* ---------- Oficina: abertos, aprovados, recusados e faturados (mensal e anual) ---------- */
+var EVENTO_OFICINA = { aberto: 'Aberto', aprovado: 'Orçamento aprovado', recusado: 'Orçamento recusado', faturado: 'Faturado' };
+
+// Eventos de cada chamado da oficina, cada um na sua data: abertura, decisão do orçamento e faturamento.
+function eventosOficina() {
+  var ev = [];
+  chamadosOficinaAno.forEach(function (c) {
+    ev.push({ tipo: 'aberto', data: new Date(c.created_at), c: c });
+    if (c.orcamento_em) {
+      var recusado = c.status === 'nao_aprovada' || c.devolvido;
+      ev.push({ tipo: recusado ? 'recusado' : 'aprovado', data: new Date(c.orcamento_em), c: c });
+    }
+    if (c.faturado_em) ev.push({ tipo: 'faturado', data: new Date(c.faturado_em), c: c });
+  });
+  return ev;
+}
+
+function contarEventos(eventos) {
+  var n = { aberto: 0, aprovado: 0, recusado: 0, faturado: 0 };
+  eventos.forEach(function (e) { n[e.tipo]++; });
+  return n;
+}
+
+function dadosOficinaMes() {
+  var ano = parseInt($('f-ano').value, 10);
+  var todos = eventosOficina().filter(function (e) { return e.data.getFullYear() === ano; });
+  var linhas = [];
+  for (var m = 0; m < 12; m++) {
+    var n = contarEventos(todos.filter(function (e) { return e.data.getMonth() === m; }));
+    linhas.push({ mes: MESES[m], num: m + 1, aberto: n.aberto, aprovado: n.aprovado, recusado: n.recusado, faturado: n.faturado });
+  }
+  return linhas;
+}
+
+function eventosDoPeriodo() {
+  var p = periodo();
+  return eventosOficina().filter(function (e) { return e.data >= p.ini && e.data < p.fim; })
+    .sort(function (a, b) { return b.data - a.data; });
+}
+
+function abaOficina() {
+  var p = periodo();
+  var ev = eventosDoPeriodo();
+  var n = contarEventos(ev);
+  var decididos = n.aprovado + n.recusado;
+  var mesSel = $('f-mes').value ? parseInt($('f-mes').value, 10) : 0;
+  var meses = dadosOficinaMes();
+  var tot = { aberto: 0, aprovado: 0, recusado: 0, faturado: 0 };
+  var linhasMes = meses.map(function (l) {
+    tot.aberto += l.aberto; tot.aprovado += l.aprovado; tot.recusado += l.recusado; tot.faturado += l.faturado;
+    return '<tr' + (l.num === mesSel ? ' style="background:#fff3cd;"' : '') + '><td>' + l.mes + '</td><td class="num">' + l.aberto + '</td><td class="num">' + l.aprovado +
+      '</td><td class="num">' + l.recusado + '</td><td class="num">' + l.faturado + '</td></tr>';
+  });
+  linhasMes.push('<tr style="font-weight:700; background:#f5f5f3;"><td>Total do ano</td><td class="num">' + tot.aberto + '</td><td class="num">' + tot.aprovado +
+    '</td><td class="num">' + tot.recusado + '</td><td class="num">' + tot.faturado + '</td></tr>');
+
+  var linhasDet = ev.map(function (e) {
+    var c = e.c;
+    return '<tr><td>' + fmtData(e.data.toISOString()) + '</td><td>' + EVENTO_OFICINA[e.tipo] + '</td><td>' + c.numero + '</td><td>' + esc(nomeCliente(c)) + '</td><td>' + esc(equipamentoTexto(c)) +
+      '</td><td>' + esc((c.descricao_defeito || '').slice(0, 100)) + '</td></tr>';
+  });
+
+  return kpis([
+    { rotulo: 'Abertos na oficina', valor: n.aberto, cor: '#1b1b18' },
+    { rotulo: 'Orçamentos aprovados', valor: n.aprovado, cor: '#2e9e5b' },
+    { rotulo: 'Orçamentos recusados', valor: n.recusado, cor: '#8a8a85' },
+    { rotulo: 'Faturados', valor: n.faturado, cor: '#d93035' },
+    { rotulo: 'Taxa de aprovação', valor: decididos ? Math.round(n.aprovado * 100 / decididos) + '%' : '—' }
+  ]) +
+  '<div class="rel-acoes"><h2>Mês a mês — ' + $('f-ano').value + '</h2><button type="button" class="btn btn-outline" id="exp-oficina-mes">Exportar Excel</button></div>' +
+  tabela([{ t: 'Mês' }, { t: 'Abertos', num: true }, { t: 'Orç. aprovados', num: true }, { t: 'Orç. recusados', num: true }, { t: 'Faturados', num: true }], linhasMes, '') +
+  '<div class="rel-acoes" style="margin-top:22px;"><h2>Detalhe — ' + p.texto + '</h2><button type="button" class="btn btn-outline" id="exp-oficina-det">Exportar Excel</button></div>' +
+  tabela([{ t: 'Data' }, { t: 'Evento' }, { t: 'Nº' }, { t: 'Cliente' }, { t: 'Equipamento' }, { t: 'Defeito' }], linhasDet, 'Nenhum evento da oficina neste período.') +
+  '<p class="rel-nota" style="margin-top:10px;">Cada evento conta na data em que aconteceu: aberto = abertura do chamado; aprovado/recusado = decisão do orçamento pela recepção; faturado = faturamento. Só chamados da oficina interna. Equipamento recusado e devolvido não é faturado.</p>';
 }
 
 /* ---------- 2) Chamados abertos ---------- */
@@ -267,7 +352,7 @@ function abaManutencao() {
 /* ---------- desenho + exportação ---------- */
 function desenhar() {
   if (!carregou) return;
-  var html = abaAtual === 'consumo' ? abaConsumo() : abaAtual === 'abertos' ? abaAbertos() : abaAtual === 'backlog' ? abaBacklog() : abaManutencao();
+  var html = abaAtual === 'oficina' ? abaOficina() : abaAtual === 'consumo' ? abaConsumo() : abaAtual === 'abertos' ? abaAbertos() : abaAtual === 'backlog' ? abaBacklog() : abaManutencao();
   $('painel').innerHTML = html;
   ligarExportacoes();
 }
@@ -275,6 +360,24 @@ function desenhar() {
 function ligarExportacoes() {
   var sufixo = sufixoArquivo();
   var b;
+  if ((b = $('exp-oficina-mes'))) b.addEventListener('click', function () {
+    exportarExcel('oficina-mes-a-mes-' + $('f-ano').value + '.xlsx', dadosOficinaMes(), [
+      { titulo: 'Mês', chave: 'mes' }, { titulo: 'Abertos', chave: 'aberto' }, { titulo: 'Orçamentos aprovados', chave: 'aprovado' },
+      { titulo: 'Orçamentos recusados', chave: 'recusado' }, { titulo: 'Faturados', chave: 'faturado' }
+    ], 'Oficina');
+  });
+  if ((b = $('exp-oficina-det'))) b.addEventListener('click', function () {
+    var d = eventosDoPeriodo();
+    if (!d.length) { showToast('Não há dados para exportar.', 'warning'); return; }
+    exportarExcel('oficina-detalhe-' + sufixo + '.xlsx', d, [
+      { titulo: 'Data', valor: function (e) { return fmtData(e.data.toISOString()); } },
+      { titulo: 'Evento', valor: function (e) { return EVENTO_OFICINA[e.tipo]; } },
+      { titulo: 'Nº', valor: function (e) { return e.c.numero; } },
+      { titulo: 'Cliente', valor: function (e) { return nomeCliente(e.c); } },
+      { titulo: 'Equipamento', valor: function (e) { return equipamentoTexto(e.c); } },
+      { titulo: 'Defeito', valor: function (e) { return e.c.descricao_defeito || ''; } }
+    ], 'Detalhe');
+  });
   if ((b = $('exp-consumo'))) b.addEventListener('click', function () {
     var d = dadosConsumo();
     if (!d.length) { showToast('Não há dados para exportar.', 'warning'); return; }
