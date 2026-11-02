@@ -104,6 +104,7 @@ async function abrirNovo() {
   $('novo-erro').hidden = true;
   ['n-cli-busca', 'n-defeito', 'n-selo', 'n-lacre', 'n-eq-marca', 'n-eq-modelo', 'n-eq-serie'].forEach(function (id) { $(id).value = ''; });
   $('n-selo-aus').checked = false; $('n-lacre-aus').checked = false;
+  $('n-eq-serie-aus').checked = false; $('n-eq-serie').disabled = false;
   $('n-selo').disabled = false; $('n-lacre').disabled = false;
   $('n-data').value = new Date().toISOString().slice(0, 10);
 
@@ -123,6 +124,10 @@ async function abrirNovo() {
 
 function erroNovo(m) { $('novo-erro').textContent = m; $('novo-erro').hidden = false; }
 
+$('n-eq-serie-aus').addEventListener('change', function () {
+  $('n-eq-serie').disabled = this.checked;
+  $('n-eq-serie').value = this.checked ? CH_SEM_SERIE : '';
+});
 $('n-selo-aus').addEventListener('change', function () { $('n-selo').disabled = this.checked; if (this.checked) $('n-selo').value = ''; });
 $('n-lacre-aus').addEventListener('change', function () { $('n-lacre').disabled = this.checked; if (this.checked) $('n-lacre').value = ''; });
 $('n-tecnico').addEventListener('change', atualizarTipoNovo);
@@ -157,8 +162,9 @@ $('n-salvar').addEventListener('click', async function () {
 
   var btn = this; btn.disabled = true;
   if (equipId === '__novo') {
-    var serie = $('n-eq-serie').value.trim();
-    if (!CH_ALFANUM.test(serie)) { btn.disabled = false; return erroNovo('Nº de série: só letras e números, até 20 caracteres.'); }
+    var ns = chNormalizarSerie($('n-eq-serie-aus').checked ? CH_SEM_SERIE : $('n-eq-serie').value);
+    if (ns.erro) { btn.disabled = false; return erroNovo(ns.erro); }
+    var serie = ns.valor;
     var eq = await supabaseClient.from('equipamentos').insert({ cliente_id: clienteId, marca: $('n-eq-marca').value.trim() || null, modelo: $('n-eq-modelo').value.trim() || null, numero_serie: serie, created_by: meuId }).select().single();
     if (eq.error) { btn.disabled = false; return erroNovo('Erro ao cadastrar equipamento: ' + eq.error.message); }
     equipId = eq.data.id;

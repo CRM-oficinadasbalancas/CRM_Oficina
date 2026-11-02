@@ -16,6 +16,19 @@ var CH_STATUS_CURTO = {
   orcamento_aprovado: 'Orç. aprovado', nao_aprovada: 'Orç. recusado', concluida: 'Fechado'
 };
 var CH_ALFANUM = /^[A-Za-z0-9]{1,20}$/;
+var CH_SEM_SERIE = 'NÃO CONSTA';
+
+// Nº de série: só letras e números (até 20, sem espaços) ou a expressão NÃO CONSTA, permitida apenas
+// quando a balança não possui número de série. Devolve { valor } normalizado ou { erro }.
+function chNormalizarSerie(texto) {
+  var s = String(texto || '').trim().replace(/\s+/g, ' ');
+  if (!s) return { erro: 'Informe o nº de série. Se a balança não possuir, marque "A balança não possui número de série".' };
+  var semAcento = s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  if (semAcento === 'NAO CONSTA') return { valor: CH_SEM_SERIE };
+  if (CH_ALFANUM.test(s)) return { valor: s.toUpperCase() };
+  return { erro: 'Nº de série: use só letras e números (sem espaços, traços ou barras), até 20 caracteres. A expressão NÃO CONSTA só é permitida quando a balança não possui número de série.' };
+}
+
 var CH_QTD = /^\d{1,5}(\.\d{1,2})?$/;
 
 // Ações possíveis por perfil e situação do chamado.
