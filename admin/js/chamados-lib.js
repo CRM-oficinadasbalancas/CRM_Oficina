@@ -40,9 +40,12 @@ function chAcoes(papel, c) {
     if (s === 'aberta') a.push('iniciar', 'pendencia');
     if (s === 'em_andamento' && c.tipo === 'campo') a.push('pendencia', 'fechar');
   }
-  if (admin || papel === 'oficina_interna') {
-    if (s === 'orcamento_aprovado') a.push('iniciar');
-    if (s === 'em_andamento' && c.tipo === 'oficina') a.push('fechar');
+  // Oficina interna controla o status dos chamados da oficina: iniciar, voltar a Pendente e fechar.
+  // (aprovar/recusar o orçamento continua só da recepção e da programação)
+  if ((admin || papel === 'oficina_interna') && c.tipo === 'oficina') {
+    if (s === 'pendente' || s === 'orcamento_aprovado') a.push('iniciar');
+    if (s === 'orcamento_aprovado' || s === 'em_andamento') a.push('pendencia');
+    if (s === 'pendente' || s === 'orcamento_aprovado' || s === 'em_andamento') a.push('fechar');
   }
   if (admin || papel === 'programadora' || papel === 'recepcao') {
     if (s === 'pendente') a.push('aprovar', 'recusar');
@@ -68,8 +71,8 @@ async function chAtualizar(c, campos, autorId, tipoHist, texto) {
   return { chamado: r.data };
 }
 
-// Chamado fechado que passou por orçamento aprovado e ainda não foi faturado.
-function chAFaturar(c) { return c.status === 'concluida' && !!c.orcamento_em && !c.faturado_em; }
+// Chamado da oficina já fechado que ainda não foi faturado.
+function chAFaturar(c) { return c.status === 'concluida' && c.tipo === 'oficina' && !c.faturado_em; }
 
 async function chFaturar(c, autorId, texto) {
   texto = (texto || '').trim();
@@ -89,7 +92,8 @@ async function chAnotar(c, autorId, texto) {
 }
 
 async function chIniciar(c, autorId) {
-  return chAtualizar(c, { status: 'em_andamento' }, autorId, 'inicio', 'Atendimento iniciado.');
+  var semAprovacao = c.status === 'pendente' && c.tipo === 'oficina';
+  return chAtualizar(c, { status: 'em_andamento' }, autorId, 'inicio', 'Atendimento iniciado' + (semAprovacao ? ' (orçamento ainda não aprovado).' : '.'));
 }
 
 function chCamposVedacao(f, obrigatorios) {

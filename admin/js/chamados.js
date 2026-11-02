@@ -252,7 +252,7 @@ function desenharDetalhe() {
     '<div><b>Selo novo</b>' + esc(c.selo_novo || '—') + '</div>' +
     '<div><b>Lacre antigo</b>' + (c.lacre_antigo_ausente ? 'Não possui' : esc(c.lacre_antigo || '—')) + '</div>' +
     '<div><b>Lacre novo</b>' + esc(c.lacre_novo || '—') + '</div>';
-  var rot = { iniciar: 'Iniciar', pendencia: 'Pendência / enviar para oficina', fechar: 'Fechar chamado', aprovar: 'Orçamento aprovado', recusar: 'Orçamento recusado', agendar: 'Reprogramar', anotar: 'Adicionar anotação', faturar: 'Marcar como faturado' };
+  var rot = { iniciar: 'Iniciar atendimento', pendencia: c.tipo === 'oficina' ? 'Voltar para Pendente' : 'Pendência / enviar para oficina', fechar: 'Fechar chamado', aprovar: 'Orçamento aprovado', recusar: 'Orçamento recusado', agendar: 'Reprogramar', anotar: 'Adicionar anotação', faturar: 'Marcar como faturado' };
   var acoes = chAcoes(papel, c);
   $('d-acoes').innerHTML = acoes.map(function (a) {
     return '<button type="button" class="btn ' + (a === 'recusar' || a === 'anotar' ? 'btn-outline' : 'btn-primary') + '" data-a="' + a + '">' + rot[a] + '</button>';
@@ -307,7 +307,7 @@ async function painelAcao(acao) {
     p.innerHTML = '<div class="ch-painel"><p>Iniciar o atendimento deste chamado?</p>' + erroEl + btnOk + '</div>';
     $('a-ok').onclick = function () { executar(function () { return chIniciar(c, meuId); }); };
   } else if (acao === 'pendencia') {
-    p.innerHTML = '<div class="ch-painel"><div class="form-field"><label for="a-hist">Histórico * — o que foi feito e por que vai para a oficina interna</label><textarea id="a-hist" rows="3"></textarea></div>' +
+    p.innerHTML = '<div class="ch-painel"><div class="form-field"><label for="a-hist">Histórico * — ' + (c.tipo === 'oficina' ? 'o que foi feito e por que o chamado volta para Pendente (ex.: aguardando orçamento ou peça)' : 'o que foi feito e por que vai para a oficina interna') + '</label><textarea id="a-hist" rows="3"></textarea></div>' +
       '<details><summary style="cursor:pointer; font-weight:600;">Selos e lacres (opcional)</summary>' + camposVedacaoHtml(false) + '</details>' + erroEl + btnOk + '</div>';
     ligarFlags();
     $('a-ok').onclick = function () { var v = lerVedacao(); v.historico = $('a-hist').value; executar(function () { return chPendencia(c, meuId, v); }); };

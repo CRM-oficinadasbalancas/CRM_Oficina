@@ -281,7 +281,7 @@ function desenharChamado() {
     (c.selo_antigo || c.selo_antigo_ausente ? '<div class="par"><b>Selo antigo</b>' + (c.selo_antigo_ausente ? 'Não possui' : esc(c.selo_antigo)) + '</div>' : '') +
     (c.lacre_antigo || c.lacre_antigo_ausente ? '<div class="par"><b>Lacre antigo</b>' + (c.lacre_antigo_ausente ? 'Não possui' : esc(c.lacre_antigo)) + '</div>' : '');
 
-  var rot = { iniciar: 'Iniciar atendimento', pendencia: 'Pendente — enviar para a oficina', fechar: 'Fechar chamado', anotar: 'Adicionar anotação' };
+  var rot = { iniciar: 'Iniciar atendimento', pendencia: c.tipo === 'oficina' ? 'Voltar para Pendente' : 'Pendente — enviar para a oficina', fechar: 'Fechar chamado', anotar: 'Adicionar anotação' };
   var acoes = chAcoes(estado.perfil.role, c).filter(function (a) { return rot[a]; });
   $('ch-acoes').innerHTML = acoes.map(function (a) {
     return '<button type="button" class="btn ' + (a === 'pendencia' || a === 'anotar' ? 'btn-escuro' : 'btn-vermelho') + ' btn-bloco" data-a="' + a + '">' + rot[a] + '</button>';
@@ -334,10 +334,10 @@ async function formAcao(acao) {
     box.innerHTML = '<div class="caixa"><label for="f-hist">Anotação * — diagnóstico, observação ou andamento</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' + rodape + '</div>';
     $('f-ok').onclick = function () { executar(function () { return chAnotar(c, estado.sessao.user.id, $('f-hist').value); }, 'Anotação registrada.', true); };
   } else if (acao === 'pendencia') {
-    box.innerHTML = '<div class="caixa"><label for="f-hist">Histórico * — o que foi feito e por que vai para a oficina interna</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' +
+    box.innerHTML = '<div class="caixa"><label for="f-hist">Histórico * — ' + (c.tipo === 'oficina' ? 'o que foi feito e por que volta para Pendente (ex.: aguardando orçamento ou peça)' : 'o que foi feito e por que vai para a oficina interna') + '</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' +
       '<details><summary>Selos e lacres (pode deixar em branco)</summary>' + vedacaoHtml(false) + '</details>' + rodape + '</div>';
     ligarFlags();
-    $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; executar(function () { return chPendencia(c, estado.sessao.user.id, v); }, 'Enviado para a oficina interna (aguardando orçamento).', false); };
+    $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; executar(function () { return chPendencia(c, estado.sessao.user.id, v); }, (c.tipo === 'oficina' ? 'Chamado voltou para Pendente.' : 'Enviado para a oficina interna (aguardando orçamento).'), false); };
   } else if (acao === 'fechar') {
     if (!estado.pecas.length) {
       var rp = await supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade').order('codigo');
