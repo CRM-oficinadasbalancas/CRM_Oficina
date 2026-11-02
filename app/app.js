@@ -243,10 +243,10 @@ function desenharChamado() {
     (c.selo_antigo || c.selo_antigo_ausente ? '<div class="par"><b>Selo antigo</b>' + (c.selo_antigo_ausente ? 'Não possui' : esc(c.selo_antigo)) + '</div>' : '') +
     (c.lacre_antigo || c.lacre_antigo_ausente ? '<div class="par"><b>Lacre antigo</b>' + (c.lacre_antigo_ausente ? 'Não possui' : esc(c.lacre_antigo)) + '</div>' : '');
 
-  var rot = { iniciar: 'Iniciar atendimento', pendencia: 'Pendente — enviar para a oficina', fechar: 'Fechar chamado' };
+  var rot = { iniciar: 'Iniciar atendimento', pendencia: 'Pendente — enviar para a oficina', fechar: 'Fechar chamado', anotar: 'Adicionar anotação' };
   var acoes = chAcoes(estado.perfil.role, c).filter(function (a) { return rot[a]; });
   $('ch-acoes').innerHTML = acoes.map(function (a) {
-    return '<button type="button" class="btn ' + (a === 'pendencia' ? 'btn-escuro' : 'btn-vermelho') + ' btn-bloco" data-a="' + a + '">' + rot[a] + '</button>';
+    return '<button type="button" class="btn ' + (a === 'pendencia' || a === 'anotar' ? 'btn-escuro' : 'btn-vermelho') + ' btn-bloco" data-a="' + a + '">' + rot[a] + '</button>';
   }).join('') || '<p class="dica">Nenhuma ação disponível neste status.</p>';
   $('ch-acoes').querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { formAcao(b.dataset.a); }); });
   $('ch-form').innerHTML = '';
@@ -292,6 +292,9 @@ async function formAcao(acao) {
   if (acao === 'iniciar') {
     box.innerHTML = '<div class="caixa"><p>Iniciar o atendimento agora?</p>' + rodape + '</div>';
     $('f-ok').onclick = function () { executar(function () { return chIniciar(c, estado.sessao.user.id); }, 'Atendimento iniciado.', true); };
+  } else if (acao === 'anotar') {
+    box.innerHTML = '<div class="caixa"><label for="f-hist">Anotação * — diagnóstico, observação ou andamento</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' + rodape + '</div>';
+    $('f-ok').onclick = function () { executar(function () { return chAnotar(c, estado.sessao.user.id, $('f-hist').value); }, 'Anotação registrada.', true); };
   } else if (acao === 'pendencia') {
     box.innerHTML = '<div class="caixa"><label for="f-hist">Histórico * — o que foi feito e por que vai para a oficina interna</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' +
       '<details><summary>Selos e lacres (pode deixar em branco)</summary>' + vedacaoHtml(false) + '</details>' + rodape + '</div>';

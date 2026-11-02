@@ -200,10 +200,10 @@ function desenharDetalhe() {
     '<div><b>Selo novo</b>' + esc(c.selo_novo || '—') + '</div>' +
     '<div><b>Lacre antigo</b>' + (c.lacre_antigo_ausente ? 'Não possui' : esc(c.lacre_antigo || '—')) + '</div>' +
     '<div><b>Lacre novo</b>' + esc(c.lacre_novo || '—') + '</div>';
-  var rot = { iniciar: 'Iniciar', pendencia: 'Pendência / enviar para oficina', fechar: 'Fechar chamado', aprovar: 'Orçamento aprovado', recusar: 'Orçamento recusado', agendar: 'Reprogramar' };
+  var rot = { iniciar: 'Iniciar', pendencia: 'Pendência / enviar para oficina', fechar: 'Fechar chamado', aprovar: 'Orçamento aprovado', recusar: 'Orçamento recusado', agendar: 'Reprogramar', anotar: 'Adicionar anotação' };
   var acoes = chAcoes(papel, c);
   $('d-acoes').innerHTML = acoes.map(function (a) {
-    return '<button type="button" class="btn ' + (a === 'recusar' ? 'btn-outline' : 'btn-primary') + '" data-a="' + a + '">' + rot[a] + '</button>';
+    return '<button type="button" class="btn ' + (a === 'recusar' || a === 'anotar' ? 'btn-outline' : 'btn-primary') + '" data-a="' + a + '">' + rot[a] + '</button>';
   }).join('') || '<span style="color:#8b95a7; font-size:0.88rem;">Nenhuma ação disponível para o seu perfil neste status.</span>';
   $('d-acoes').querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { painelAcao(b.dataset.a); }); });
   $('d-painel').innerHTML = '';
@@ -267,6 +267,9 @@ async function painelAcao(acao) {
       '</select></div><div class="form-field"><label for="a-qtd">Quantidade usada</label><input type="text" id="a-qtd" maxlength="8" placeholder="Ex: 1"></div></div>' + erroEl + btnOk + '</div>';
     ligarFlags();
     $('a-ok').onclick = function () { var v = lerVedacao(); v.historico = $('a-hist').value; v.pecaId = $('a-peca').value; v.qtd = $('a-qtd').value; executar(function () { return chFechar(c, meuId, v); }); };
+  } else if (acao === 'anotar') {
+    p.innerHTML = '<div class="ch-painel"><div class="form-field"><label for="a-nota">Anotação * — diagnóstico, observação ou andamento</label><textarea id="a-nota" rows="3" maxlength="5000"></textarea></div>' + erroEl + btnOk + '</div>';
+    $('a-ok').onclick = function () { executar(function () { return chAnotar(c, meuId, $('a-nota').value); }); };
   } else if (acao === 'aprovar' || acao === 'recusar') {
     var aprova = acao === 'aprovar';
     p.innerHTML = '<div class="ch-painel"><p>' + (aprova ? 'Orçamento <b>aprovado</b>: o equipamento segue para a oficina interna.' : 'Orçamento <b>recusado</b>: o equipamento não será consertado e deve ser devolvido ao cliente.') + '</p>' +
@@ -312,10 +315,8 @@ $('btn-novo').addEventListener('click', abrirNovo);
   window.CH_AUTOR_NOME = auth.profile.nome_exibicao;
   $('btn-novo').hidden = ['admin', 'programadora', 'recepcao'].indexOf(papel) === -1;
   $('link-clientes').hidden = !(papel === 'admin' || papel === 'programadora' || papel === 'recepcao');
-  if (['admin', 'programadora', 'recepcao'].indexOf(papel) !== -1) {
-    var t = await supabaseClient.rpc('listar_tecnicos');
-    tecnicos = t.data || [];
-  }
+  var t = await supabaseClient.rpc('listar_tecnicos');
+  tecnicos = t.data || [];
   // cada perfil começa no filtro que mais usa
   filtro = papel === 'oficina_interna' ? 'oficina' : (papel === 'recepcao' ? 'orcamento' : (papel === 'programadora' ? 'campo' : 'abertos'));
   await carregar();

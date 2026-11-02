@@ -35,6 +35,8 @@ function chAcoes(papel, c) {
     if (s === 'pendente') a.push('aprovar', 'recusar');
   }
   if ((admin || papel === 'programadora') && c.tipo === 'campo' && (s === 'aberta' || s === 'em_andamento')) a.push('agendar');
+  // anotação no histórico (diagnóstico, observação): qualquer perfil do chamado, enquanto ele não está encerrado
+  if (admin || ((papel === 'tecnico' || papel === 'oficina_interna' || papel === 'programadora' || papel === 'recepcao') && s !== 'concluida' && s !== 'nao_aprovada')) a.push('anotar');
   return a.filter(function (x, i) { return a.indexOf(x) === i; });
 }
 
@@ -49,6 +51,15 @@ async function chAtualizar(c, campos, autorId, tipoHist, texto) {
   if (r.error) return { erro: r.error.message };
   if (texto) await chHistorico(c.id, autorId, tipoHist, campos.status, texto);
   return { chamado: r.data };
+}
+
+// Anotação livre no histórico do chamado (não muda status nem campos do chamado).
+async function chAnotar(c, autorId, texto) {
+  texto = (texto || '').trim();
+  if (!texto) return { erro: 'Escreva a anotação.' };
+  var r = await chHistorico(c.id, autorId, 'nota', c.status, texto);
+  if (r.error) return { erro: r.error.message };
+  return { chamado: c };
 }
 
 async function chIniciar(c, autorId) {
