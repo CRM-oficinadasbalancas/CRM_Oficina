@@ -54,10 +54,22 @@ async function carregar() {
   desenharLista();
 }
 
+// Abas que pedem ação de cada perfil: ficam vermelhas com o contador enquanto houver pendência.
+var ALERTAS_POR_PAPEL = {
+  admin: ['faturar', 'orcamento'],
+  recepcao: ['faturar', 'orcamento'],
+  programadora: ['orcamento'],
+  oficina_interna: ['aprovados', 'recusados']
+};
+
 function desenharChips() {
+  var alertas = ALERTAS_POR_PAPEL[papel] || [];
   $('ch-chips').innerHTML = filtrosAtivos().map(function (f) {
     var n = chamados.filter(f.fn).length;
-    return '<button type="button" class="ch-chip' + (f.id === filtro ? ' ativo' : '') + '" data-f="' + f.id + '">' + f.rotulo + '<small>' + n + '</small></button>';
+    var pede = alertas.indexOf(f.id) !== -1;
+    var alerta = pede && n > 0;
+    return '<button type="button" class="ch-chip' + (alerta ? ' alerta' : '') + (f.id === filtro ? ' ativo' : '') + '" data-f="' + f.id + '">' + f.rotulo +
+      (pede && n === 0 ? '' : '<small>' + n + '</small>') + '</button>';
   }).join('');
   $('ch-chips').querySelectorAll('.ch-chip').forEach(function (b) {
     b.addEventListener('click', function () { filtro = b.dataset.f; desenharChips(); desenharLista(); });
@@ -381,6 +393,13 @@ document.addEventListener('keydown', function (e) {
 });
 $('ch-busca').addEventListener('input', function () { busca = this.value; desenharLista(); });
 $('btn-novo').addEventListener('click', abrirNovo);
+
+// atualiza a lista sozinha a cada minuto (sem janela aberta), para os contadores acompanharem o trabalho dos outros perfis
+setInterval(function () {
+  if (document.hidden || !papel) return;
+  if (document.querySelector('.modal-overlay.open')) return;
+  carregar();
+}, 60000);
 
 (async function () {
   var auth = await window.ADMIN_AUTH_READY;
