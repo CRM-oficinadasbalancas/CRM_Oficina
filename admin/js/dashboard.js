@@ -263,14 +263,19 @@ async function carregarQuadrante(quadrante) {
     .from('clientes')
     .select('id, razao_social, telefone_empresa, email_empresa, created_at, categoria, situacao, canal_aquisicao, cliente_historico(created_at, resultado, status)')
     .eq('categoria', quadrante.categoria)
-    .eq('situacao', 'ativo')
+    .in('situacao', quadrante.categoria === 'manutencao' ? ['ativo', 'ganho'] : ['ativo'])
     .order('created_at', { referencedTable: 'cliente_historico', ascending: true });
 
   if (error) {
     showToast('Erro ao carregar ' + quadrante.label + ': ' + error.message, 'error');
     return;
   }
-  clientes = clientes || [];
+  clientes = (clientes || []).filter(function (c) {
+    // Ganho de Manutenção só aparece quando há revisão preventiva a fazer.
+    if (c.situacao !== 'ganho') return true;
+    var r = calcularProximoRetorno(c, c.cliente_historico || []);
+    return r.revisao && !r.concluido;
+  });
 
   document.getElementById('quad-count-' + quadrante.categoria).textContent = clientes.length;
 

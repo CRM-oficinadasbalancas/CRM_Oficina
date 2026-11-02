@@ -13,6 +13,10 @@
 //     contando os "negativo" acumulados pra saber em qual das 3 etapas está.
 //   - sem resultado marcado ainda → precisa definir (prioridade máxima).
 //
+// Revisão preventiva: lead de Manutenção que já fechou (situação Ganho, com ao menos um
+// contato "Fechou o serviço") continua na cadência acima: 60 dias após o fechamento volta
+// como "Revisão". A situação Ganho (e a taxa de fechamento) não muda.
+//
 // Pós-venda: sem histórico ainda → 30 dias pro 1º retorno. Depois:
 //   - "positivo" → resolvido, não agenda mais nada.
 //   - "negativo" → mais 30 dias.
@@ -27,6 +31,11 @@ function addDias(data, dias) {
   return new Date(data.getTime() + dias * 24 * 60 * 60 * 1000);
 }
 
+function marcarRevisao(retorno, revisao) {
+  retorno.revisao = !!revisao;
+  return retorno;
+}
+
 // historico: array de { created_at, resultado } ordenado ASC por created_at.
 // Retorna: { data: Date|null, prioridadeMaxima: boolean, concluido: boolean }
 // prioridadeMaxima = precisa de ação agora (sem histórico, ou sem resultado definido).
@@ -35,9 +44,16 @@ function calcularProximoRetorno(cliente, historico) {
   var categoria = cliente.categoria;
   historico = historico || [];
 
-  // Lead já encerrado (ganho/perdido) não gera mais retorno.
+  // Lead já encerrado (ganho/perdido) não gera mais retorno, exceto a revisão preventiva
+  // de Manutenção (ganho com serviço fechado no histórico).
+  var revisao = false;
   if (cliente.situacao && cliente.situacao !== 'ativo') {
-    return { data: null, prioridadeMaxima: false, concluido: true, situacao: cliente.situacao };
+    var fechouServico = categoria === 'manutencao' && cliente.situacao === 'ganho' &&
+      historico.some(function (h) { return h.resultado === 'positivo'; });
+    if (!fechouServico) {
+      return { data: null, prioridadeMaxima: false, concluido: true, situacao: cliente.situacao };
+    }
+    revisao = true;
   }
 
   if (categoria === 'venda') {
@@ -53,22 +69,22 @@ function calcularProximoRetorno(cliente, historico) {
 
   if (categoria === 'manutencao') {
     if (!historico.length) {
-      return { data: null, prioridadeMaxima: true, concluido: false };
+      return marcarRevisao({ data: null, prioridadeMaxima: true, concluido: false }, revisao);
     }
     var ultimaM = historico[historico.length - 1];
     if (!ultimaM.resultado) {
-      return { data: null, prioridadeMaxima: true, concluido: false };
+      return marcarRevisao({ data: null, prioridadeMaxima: true, concluido: false }, revisao);
     }
     if (ultimaM.resultado === 'positivo') {
       var fechados = historico.filter(function (h) { return h.resultado === 'positivo'; });
-      if (fechados.length >= 2) return { data: null, prioridadeMaxima: false, concluido: true };
-      return { data: addDias(new Date(ultimaM.created_at), 60), prioridadeMaxima: false, concluido: false };
+      if (fechados.length >= 2) return marcarRevisao({ data: null, prioridadeMaxima: false, concluido: true }, revisao);
+      return marcarRevisao({ data: addDias(new Date(ultimaM.created_at), 60), prioridadeMaxima: false, concluido: false }, revisao);
     }
     // negativo: cai na cadência de vendas
     var negativos = historico.filter(function (h) { return h.resultado === 'negativo'; });
-    if (negativos.length > HORAS_VENDAS.length) return { data: null, prioridadeMaxima: false, concluido: true };
+    if (negativos.length > HORAS_VENDAS.length) return marcarRevisao({ data: null, prioridadeMaxima: false, concluido: true }, revisao);
     var idx = Math.min(negativos.length - 1, HORAS_VENDAS.length - 1);
-    return { data: addHoras(new Date(ultimaM.created_at), HORAS_VENDAS[idx]), prioridadeMaxima: false, concluido: false };
+    return marcarRevisao({ data: addHoras(new Date(ultimaM.created_at), HORAS_VENDAS[idx]), prioridadeMaxima: false, concluido: false }, revisao);
   }
 
   if (categoria === 'pos_venda') {
@@ -90,6 +106,10 @@ function calcularProximoRetorno(cliente, historico) {
 
 // Texto curto pra exibir na UI (badge de prazo).
 function formatarPrazo(retorno) {
+  if (retorno.revisao && !retorno.concluido) {
+    var base = formatarPrazo(Object.assign({}, retorno, { revisao: false }));
+    return { texto: 'Revisão — ' + base.texto, classe: base.classe };
+  }
   if (retorno.situacao === 'ganho') return { texto: 'Ganho', classe: 'badge-ok' };
   if (retorno.situacao === 'perdido') return { texto: 'Perdido', classe: '' };
   if (retorno.concluido) return { texto: 'Concluído', classe: 'badge-ok' };

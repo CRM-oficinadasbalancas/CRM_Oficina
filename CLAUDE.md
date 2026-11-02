@@ -57,5 +57,5 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
    técnico = clientes/histórico + AT/equipamentos/estoque; profiles só admin (cada um edita o próprio sem mudar role); alertas_enviados só service_role.
    Falta: testar cada tela logado com um usuário Técnico e um Atendente de verdade.
 5. Ligar a proteção contra senhas vazadas no Supabase Auth; avaliar Pro/keep-alive por causa da pausa do free tier.
-6. (feito) Status "Fechado" encerra o lead como ganho/perdido. Pendente de decisão: manutenção preventiva 60 dias após ganho em Manutenção (hoje o ganho encerra o acompanhamento).
+6. (feito) Status "Fechado" encerra o lead como ganho/perdido. Revisão preventiva: lead de Manutenção ganho (com contato positivo no histórico) volta 60 dias depois como "Revisão" no funil e no dashboard, sem mudar a situação Ganho (prazos.js, campo `revisao`); após 2 contatos positivos conclui.
 7. Testar as telas logado com dados reais (só foi testado com dados simulados).

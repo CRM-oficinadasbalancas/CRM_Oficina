@@ -34,7 +34,13 @@ async function loadPipeline() {
 function renderPipelineTable() {
   var tbody = document.getElementById('pipeline-tbody');
   var filtro = document.getElementById('pipeline-filtro-situacao').value;
-  var visiveis = pipelineClientes.filter(function (c) { return !filtro || c.situacao === filtro; });
+  // Em "Ativos" entram também os Ganhos de Manutenção que têm revisão preventiva a fazer.
+  var visiveis = pipelineClientes.filter(function (c) {
+    if (!filtro || c.situacao === filtro) return true;
+    if (filtro !== 'ativo' || c.situacao !== 'ganho') return false;
+    var r = calcularProximoRetorno(c, pipelineHistoricoPorCliente[c.id] || []);
+    return r.revisao && !r.concluido;
+  });
   if (!visiveis.length) {
     tbody.innerHTML = '<tr><td colspan="7">Nenhum cliente neste filtro em ' + PIPELINE_LABEL + '.</td></tr>';
     return;
@@ -64,7 +70,7 @@ function renderPipelineTable() {
     var contato = [c.telefone_empresa, c.email_empresa].filter(Boolean).join(' — ') || '—';
     var prazo = formatarPrazo(item.retorno);
     var badgePrazo = prazo.classe ? '<span class="badge ' + prazo.classe + '">' + prazo.texto + '</span>' : prazo.texto;
-    var classeLinha = (c.situacao === 'ativo' && !item.retorno.concluido) ? ' class="row-' + classificarUrgencia(item.retorno) + '"' : '';
+    var classeLinha = ((c.situacao === 'ativo' || item.retorno.revisao) && !item.retorno.concluido) ? ' class="row-' + classificarUrgencia(item.retorno) + '"' : '';
     return '<tr' + classeLinha + '>' +
       '<td><button type="button" class="link-cliente" data-abrir="' + c.id + '">' + escHtml(c.razao_social || '') + '</button></td>' +
       '<td>' + contato + '</td>' +
