@@ -48,7 +48,6 @@
     <a href="manutencao.html" data-role="vendedor">Manutenção</a>
     <a href="pos-venda.html" data-role="atendente vendedor">Pós-venda</a>
     <a href="chamados.html" class="active" data-role="programadora recepcao tecnico oficina_interna">Chamados</a>
-    <a href="assistencia-tecnica.html" data-role="admin">Assistência Técnica</a>
     <a href="relatorios.html" data-role="admin">Relatórios</a>
     <a href="estoque.html" data-role="admin">Estoque</a>
     <a href="clientes.html" data-role="atendente programadora recepcao">Clientes</a>
@@ -65,8 +64,7 @@
   <h1 class="admin-title">Chamados</h1>
 
   <div class="ch-barra">
-    <button type="button" class="btn btn-primary" id="btn-novo-campo" hidden>+ Chamado de campo</button>
-    <button type="button" class="btn btn-primary" id="btn-novo-oficina" hidden>+ Chamado da oficina interna</button>
+    <button type="button" class="btn btn-primary" id="btn-novo" hidden>+ Novo chamado</button>
     <a href="clientes.html" class="btn btn-outline" id="link-clientes" hidden>Cadastrar cliente</a>
     <input type="search" id="ch-busca" class="table-search" placeholder="Buscar por nº, cliente, equipamento ou defeito" style="margin-left:auto; min-width:260px;">
   </div>
@@ -100,13 +98,13 @@
     </div>
     <div class="form-field"><label for="n-defeito">Defeito *</label><textarea id="n-defeito" rows="3" maxlength="5000"></textarea></div>
 
-    <div id="n-bloco-campo">
-      <div class="form-grid">
-        <div class="form-field"><label for="n-tecnico">Técnico *</label><select id="n-tecnico"></select></div>
-        <div class="form-field"><label for="n-data">Data da visita *</label><input type="date" id="n-data"></div>
-      </div>
+    <div class="form-field"><label for="n-tecnico">Atribuir ao técnico *</label><select id="n-tecnico"></select>
+      <span class="hint" id="n-tipo-hint">Técnico de campo = chamado de campo (visita). Técnico da oficina interna = equipamento recebido na oficina.</span>
     </div>
-    <div id="n-bloco-oficina">
+    <div id="n-bloco-campo" hidden>
+      <div class="form-field"><label for="n-data">Data da visita *</label><input type="date" id="n-data"></div>
+    </div>
+    <div id="n-bloco-oficina" hidden>
       <div class="form-grid">
         <div class="form-field"><label for="n-selo">Selo antigo</label><input type="text" id="n-selo" maxlength="20">
           <label class="check-linha"><input type="checkbox" id="n-selo-aus"> Não possui selo</label></div>

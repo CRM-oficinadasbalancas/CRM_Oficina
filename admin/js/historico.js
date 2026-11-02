@@ -1,5 +1,5 @@
 // Compartilhado entre clientes.html, vendas/manutencao/pos-venda (pipeline.js)
-// e assistencia-tecnica.html.
+// e chamados.html.
 
 var HISTORICO_STATUS_ASSISTENCIA_LABELS = {
   aberta: 'Aberta', em_andamento: 'Em andamento', pendente: 'Pendente', concluida: 'Concluída', nao_aprovada: 'Não aprovado pelo cliente'
@@ -68,7 +68,7 @@ function abrirEdicaoAssistencia(assistenciaId) {
       modal.classList.remove('open');
     });
   } else {
-    location.href = 'assistencia-tecnica.html?editar=' + assistenciaId;
+    location.href = 'chamados.html?abrir=' + assistenciaId;
   }
 }
 

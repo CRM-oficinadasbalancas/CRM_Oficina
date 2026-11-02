@@ -3,7 +3,7 @@
 
 var papel = null, meuId = null;
 var chamados = [], tecnicos = [], pecas = [], clientes = [], equipamentos = [];
-var filtro = 'abertos', busca = '', tipoNovo = 'campo', atual = null;
+var filtro = 'abertos', busca = '', tipoNovo = null, atual = null;
 
 function $(id) { return document.getElementById(id); }
 function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -55,7 +55,7 @@ function desenharLista() {
   if (filtro === 'fechados' || filtro === 'recusados' || filtro === 'todos') itens.reverse();
   if (!itens.length) { $('ch-tbody').innerHTML = '<tr><td colspan="7">Nenhum chamado neste filtro.</td></tr>'; return; }
   $('ch-tbody').innerHTML = itens.map(function (c) {
-    var agenda = c.tipo === 'campo' ? esc(nomeTecnico(c.tecnico_id)) + (c.data_agendada ? '<br><small>' + fmtDia(c.data_agendada) + '</small>' : '') : '<span class="tipo-tag">Oficina interna</span>';
+    var agenda = c.tipo === 'campo' ? esc(nomeTecnico(c.tecnico_id)) + (c.data_agendada ? '<br><small>' + fmtDia(c.data_agendada) + '</small>' : '') : '<span class="tipo-tag">Oficina interna</span>' + (c.tecnico_id ? '<br><small>' + esc(nomeTecnico(c.tecnico_id)) + '</small>' : '');
     return '<tr class="ch-linha" data-id="' + c.id + '"><td><b>' + c.numero + '</b></td><td>' + fmtData(c.created_at) + '</td><td>' + esc(c.clientes ? c.clientes.razao_social : '—') +
       '</td><td>' + esc(equipTxt(c)) + '</td><td>' + esc((c.descricao_defeito || '').slice(0, 90)) + '</td><td>' + agenda +
       '</td><td><span class="ch-st st-' + c.status + '">' + CH_STATUS_CURTO[c.status] + '</span></td></tr>';
@@ -86,11 +86,21 @@ async function carregarEquip(clienteId) {
   }).join('') + '<option value="__novo">+ Cadastrar novo equipamento</option>';
 }
 
-async function abrirNovo(tipo) {
-  tipoNovo = tipo;
-  $('novo-titulo').textContent = tipo === 'campo' ? 'Novo chamado de campo' : 'Novo chamado — oficina interna';
-  $('n-bloco-campo').hidden = tipo !== 'campo';
-  $('n-bloco-oficina').hidden = tipo !== 'oficina';
+function tipoDoTecnico(id) {
+  var t = tecnicos.find(function (x) { return x.id === id; });
+  return t ? (t.role === 'oficina_interna' ? 'oficina' : 'campo') : null;
+}
+
+// O técnico escolhido define o tipo: campo (visita) ou oficina interna (selo/lacre antigo obrigatórios).
+function atualizarTipoNovo() {
+  tipoNovo = tipoDoTecnico($('n-tecnico').value);
+  $('n-bloco-campo').hidden = tipoNovo !== 'campo';
+  $('n-bloco-oficina').hidden = tipoNovo !== 'oficina';
+  $('novo-titulo').textContent = tipoNovo === 'campo' ? 'Novo chamado — campo' : (tipoNovo === 'oficina' ? 'Novo chamado — oficina interna' : 'Novo chamado');
+}
+
+async function abrirNovo() {
+  tipoNovo = null;
   $('novo-erro').hidden = true;
   ['n-cli-busca', 'n-defeito', 'n-selo', 'n-lacre', 'n-eq-marca', 'n-eq-modelo', 'n-eq-serie'].forEach(function (id) { $(id).value = ''; });
   $('n-selo-aus').checked = false; $('n-lacre-aus').checked = false;
@@ -100,12 +110,14 @@ async function abrirNovo(tipo) {
   var r = await supabaseClient.from('clientes').select('id, razao_social, nome_fantasia').eq('eh_cliente', true).order('razao_social');
   clientes = r.data || [];
   opcoesClientes('');
-  if (tipo === 'campo') {
-    var t = await supabaseClient.rpc('listar_tecnicos');
-    tecnicos = t.data || tecnicos;
-    var soCampo = tecnicos.filter(function (x) { return x.role === 'tecnico'; });
-    $('n-tecnico').innerHTML = '<option value="">— Selecione —</option>' + soCampo.map(function (x) { return '<option value="' + x.id + '">' + esc(x.nome) + '</option>'; }).join('');
+  var t = await supabaseClient.rpc('listar_tecnicos');
+  tecnicos = t.data || tecnicos;
+  function grupo(rotulo, role) {
+    var l = tecnicos.filter(function (x) { return x.role === role; });
+    return l.length ? '<optgroup label="' + rotulo + '">' + l.map(function (x) { return '<option value="' + x.id + '">' + esc(x.nome) + '</option>'; }).join('') + '</optgroup>' : '';
   }
+  $('n-tecnico').innerHTML = '<option value="">— Selecione —</option>' + grupo('Técnicos de campo', 'tecnico') + grupo('Oficina interna', 'oficina_interna');
+  atualizarTipoNovo();
   $('modal-novo').classList.add('open');
 }
 
@@ -113,6 +125,7 @@ function erroNovo(m) { $('novo-erro').textContent = m; $('novo-erro').hidden = f
 
 $('n-selo-aus').addEventListener('change', function () { $('n-selo').disabled = this.checked; if (this.checked) $('n-selo').value = ''; });
 $('n-lacre-aus').addEventListener('change', function () { $('n-lacre').disabled = this.checked; if (this.checked) $('n-lacre').value = ''; });
+$('n-tecnico').addEventListener('change', atualizarTipoNovo);
 $('n-cli-busca').addEventListener('input', function () { opcoesClientes(this.value); });
 $('n-cliente').addEventListener('change', function () { carregarEquip(this.value); });
 $('n-equip').addEventListener('change', function () { $('n-equip-novo').hidden = this.value !== '__novo'; });
@@ -124,12 +137,13 @@ $('n-salvar').addEventListener('click', async function () {
   if (!clienteId) return erroNovo('Selecione o cliente.');
   if (!equipId) return erroNovo('Selecione (ou cadastre) o equipamento.');
   if (!defeito) return erroNovo('Informe o defeito.');
-  var campos = { cliente_id: clienteId, descricao_defeito: defeito, tipo: tipoNovo };
+  if (!$('n-tecnico').value) return erroNovo('Escolha o técnico — ele define se o chamado é de campo ou da oficina interna.');
+  atualizarTipoNovo();
+  var campos = { cliente_id: clienteId, descricao_defeito: defeito, tipo: tipoNovo, tecnico_id: $('n-tecnico').value };
 
   if (tipoNovo === 'campo') {
-    if (!$('n-tecnico').value) return erroNovo('Escolha o técnico.');
     if (!$('n-data').value) return erroNovo('Informe a data da visita.');
-    campos.tecnico_id = $('n-tecnico').value; campos.data_agendada = $('n-data').value; campos.status = 'aberta';
+    campos.data_agendada = $('n-data').value; campos.status = 'aberta';
   } else {
     var selo = $('n-selo').value.trim(), lacre = $('n-lacre').value.trim();
     if (!selo && !$('n-selo-aus').checked) return erroNovo('Informe o selo antigo ou marque "Não possui selo".');
@@ -180,7 +194,7 @@ function desenharDetalhe() {
     '<div><b>Endereço</b>' + (end ? esc(end) + (mapa ? ' <a href="' + mapa + '" target="_blank" rel="noopener" style="color:#d93035;">mapa</a>' : '') : '—') + '</div>' +
     '<div><b>Equipamento</b>' + esc(equipTxt(c)) + '</div>' +
     '<div><b>Abertura</b>' + fmtData(c.created_at) + '</div>' +
-    '<div><b>Técnico / visita</b>' + (c.tipo === 'campo' ? esc(nomeTecnico(c.tecnico_id)) + ' · ' + fmtDia(c.data_agendada) : '—') + '</div>' +
+    '<div><b>Técnico / visita</b>' + (c.tecnico_id ? esc(nomeTecnico(c.tecnico_id)) + (c.tipo === 'campo' ? ' · ' + fmtDia(c.data_agendada) : '') : '—') + '</div>' +
     '<div style="grid-column:1/-1;"><b>Defeito</b>' + esc(c.descricao_defeito) + '</div>' +
     '<div><b>Selo antigo</b>' + (c.selo_antigo_ausente ? 'Não possui' : esc(c.selo_antigo || '—')) + '</div>' +
     '<div><b>Selo novo</b>' + esc(c.selo_novo || '—') + '</div>' +
@@ -289,18 +303,14 @@ async function executar(fn) {
 
 $('d-fechar').addEventListener('click', function () { $('modal-det').classList.remove('open'); });
 $('ch-busca').addEventListener('input', function () { busca = this.value; desenharLista(); });
-$('btn-novo-campo').addEventListener('click', function () { abrirNovo('campo'); });
-$('btn-novo-oficina').addEventListener('click', function () { abrirNovo('oficina'); });
+$('btn-novo').addEventListener('click', abrirNovo);
 
 (async function () {
   var auth = await window.ADMIN_AUTH_READY;
   if (!auth) return;
   papel = auth.profile.role; meuId = auth.session.user.id;
   window.CH_AUTOR_NOME = auth.profile.nome_exibicao;
-  var podeCampo = papel === 'admin' || papel === 'programadora';
-  var podeOficina = papel === 'admin' || papel === 'recepcao';
-  $('btn-novo-campo').hidden = !podeCampo;
-  $('btn-novo-oficina').hidden = !podeOficina;
+  $('btn-novo').hidden = ['admin', 'programadora', 'recepcao'].indexOf(papel) === -1;
   $('link-clientes').hidden = !(papel === 'admin' || papel === 'programadora' || papel === 'recepcao');
   if (['admin', 'programadora', 'recepcao'].indexOf(papel) !== -1) {
     var t = await supabaseClient.rpc('listar_tecnicos');
@@ -308,5 +318,7 @@ $('btn-novo-oficina').addEventListener('click', function () { abrirNovo('oficina
   }
   // cada perfil começa no filtro que mais usa
   filtro = papel === 'oficina_interna' ? 'oficina' : (papel === 'recepcao' ? 'orcamento' : (papel === 'programadora' ? 'campo' : 'abertos'));
-  carregar();
+  await carregar();
+  var alvo = new URLSearchParams(location.search).get('abrir');
+  if (alvo) abrirDetalhe(alvo);
 })();

@@ -43,7 +43,8 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
   Para técnico e admin; mesmo Supabase/RLS. Sem service worker/manifest (a versão instalável foi removida).
 - Relatórios (só admin, `admin/relatorios.html`): consumo de peças, chamados abertos, backlog e manutenção por defeito/peças; filtro por ano e mês (data de abertura do chamado); exporta Excel.
   Defeito é texto livre (agrupa descrições iguais); ideia futura: lista de tipos de defeito.
-- Menu (lateral): Dashboard, Vendas, Manutenção, Pós-venda, Assistência Técnica, Relatórios, Estoque, Clientes, Usuários. Estoque e Assistência Técnica não mudam.
+- Menu (lateral): Dashboard, Vendas, Manutenção, Pós-venda, Chamados (é a antiga Assistência Técnica; `assistencia-tecnica.html` só redireciona), Relatórios, Estoque, Clientes, Usuários.
+- Chamados: um único botão "Novo chamado" (admin/programadora/recepção). O técnico escolhido define o tipo: `tecnico` = campo (data da visita, sem selo/lacre antigo); `oficina_interna` = oficina (pendente/aguardando orçamento, defeito + selo antigo + lacre antigo obrigatórios ou "Não possui"). Regra no gatilho `private.validar_chamado` (migration 0017).
 - Dashboard estilo BI (Chart.js) + "Tratado hoje"/"Pendente" por funil; clicar no nome abre a ficha (`admin/js/cliente-detalhe.js`).
 
 ## Pendências
