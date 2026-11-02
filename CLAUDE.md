@@ -45,6 +45,7 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
   Defeito é texto livre (agrupa descrições iguais); ideia futura: lista de tipos de defeito.
 - Menu (lateral): Dashboard, Vendas, Manutenção, Pós-venda, Chamados (é a antiga Assistência Técnica; `assistencia-tecnica.html` só redireciona), Relatórios, Estoque, Clientes, Usuários.
 - Chamados: um único botão "Novo chamado" (admin/programadora/recepção). O técnico escolhido define o tipo: `tecnico` = campo (data da visita, sem selo/lacre antigo); `oficina_interna` = oficina (pendente/aguardando orçamento, defeito + selo antigo + lacre antigo obrigatórios ou "Não possui"). Regra no gatilho `private.validar_chamado` (migration 0017).
+- Fluxo da oficina: recepção abre (Pendente) → recepção/programação aprova ou recusa o orçamento → oficina interna inicia e fecha → volta para a recepção faturar (`faturado_em/faturado_por`, migration 0021; aba "A faturar"; só chamados fechados com `orcamento_em`). Oficina interna e técnico de rua só mudam status nas etapas deles e podem anotar no histórico (`chAnotar`). Abas por perfil em `FILTROS_POR_PAPEL` (PC) e `ABAS` (app). Modelos de balança = lista geral (marca+modelo de todos os equipamentos); série obrigatória (letras/números ou NÃO CONSTA, migration 0020).
 - Dashboard estilo BI (Chart.js) + "Tratado hoje"/"Pendente" por funil; clicar no nome abre a ficha (`admin/js/cliente-detalhe.js`).
 
 ## Pendências
