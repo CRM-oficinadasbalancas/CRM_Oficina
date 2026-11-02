@@ -60,7 +60,7 @@ async function buscarTodosClientes() {
   for (var inicio = 0; ; inicio += passo) {
     var { data, error } = await supabaseClient
       .from('clientes')
-      .select('categoria, situacao, canal_aquisicao, created_at, eh_cliente')
+      .select('categoria, situacao, canal_aquisicao, created_at, eh_cliente, encerrado_em, encerrado_por_nome')
       .range(inicio, inicio + passo - 1);
     if (error) throw error;
     todos = todos.concat(data || []);
@@ -81,6 +81,56 @@ function contar(lista, chaveFn) {
   return m;
 }
 
+var clientesEfetividade = [];
+
+// Efetividade de fechamento: ganhos ÷ (ganhos + perdidos), por quem fechou e por mês do fechamento.
+function desenharEfetividade() {
+  var sel = document.getElementById('efet-periodo');
+  if (!sel) return;
+  if (!sel.options.length) {
+    var ops = '<option value="">Todo o período</option>';
+    var hoje = new Date();
+    for (var i = 0; i < 12; i++) {
+      var d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      ops += '<option value="' + d.getFullYear() + '-' + (d.getMonth() + 1) + '">' +
+        d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) + '</option>';
+    }
+    sel.innerHTML = ops;
+    sel.addEventListener('change', desenharEfetividade);
+  }
+  var periodo = sel.value;
+  var porPessoa = {};
+  clientesEfetividade.forEach(function (c) {
+    if (c.situacao !== 'ganho' && c.situacao !== 'perdido') return;
+    if (periodo) {
+      if (!c.encerrado_em) return;
+      var dt = new Date(c.encerrado_em);
+      if (dt.getFullYear() + '-' + (dt.getMonth() + 1) !== periodo) return;
+    }
+    var quem = c.encerrado_por_nome || (c.encerrado_em ? 'Não identificado' : 'Sem registro');
+    if (!porPessoa[quem]) porPessoa[quem] = { ganho: 0, perdido: 0 };
+    porPessoa[quem][c.situacao]++;
+  });
+  var nomes = Object.keys(porPessoa).sort(function (a, b) {
+    return (porPessoa[b].ganho + porPessoa[b].perdido) - (porPessoa[a].ganho + porPessoa[a].perdido);
+  });
+  var tot = { ganho: 0, perdido: 0 };
+  var linhas = nomes.map(function (n) {
+    var x = porPessoa[n], enc = x.ganho + x.perdido;
+    tot.ganho += x.ganho; tot.perdido += x.perdido;
+    return '<tr><td>' + n.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</td><td class="num">' + x.ganho + '</td><td class="num">' + x.perdido +
+      '</td><td class="num">' + enc + '</td><td class="num"><b>' + Math.round(x.ganho * 100 / enc) + '%</b></td></tr>';
+  });
+  if (!linhas.length) {
+    document.getElementById('efet-tbody').innerHTML = '<tr><td colspan="5">Nenhum lead fechado neste período.</td></tr>';
+    return;
+  }
+  var encTotal = tot.ganho + tot.perdido;
+  linhas.push('<tr style="font-weight:700; background:#f5f5f3;"><td>Total</td><td class="num">' + tot.ganho + '</td><td class="num">' + tot.perdido +
+    '</td><td class="num">' + encTotal + '</td><td class="num">' + Math.round(tot.ganho * 100 / encTotal) + '%</td></tr>');
+  document.getElementById('efet-tbody').innerHTML = linhas.join('');
+}
+
 async function carregarEstatisticas() {
   var clientes;
   try {
@@ -97,6 +147,8 @@ async function carregarEstatisticas() {
   var ganhos = clientes.filter(function (c) { return c.situacao === 'ganho'; }).length;
   var perdidos = clientes.filter(function (c) { return c.situacao === 'perdido'; }).length;
   var encerrados = ganhos + perdidos;
+  clientesEfetividade = clientes;
+  desenharEfetividade();
 
   document.getElementById('kpi-ativos').textContent = ativos;
   document.getElementById('kpi-ganhos').textContent = ganhos;

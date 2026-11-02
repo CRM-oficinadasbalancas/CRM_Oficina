@@ -114,6 +114,20 @@
     <div class="bi-card"><h2>Leads por funil</h2><div class="bi-chart-box"><canvas id="chart-funil"></canvas></div></div>
   </div>
 
+  <div class="bi-section">Efetividade no fechamento</div>
+  <div class="bi-card">
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+      <label for="efet-periodo" style="font-weight:600;">Período do fechamento</label>
+      <select id="efet-periodo"></select>
+      <span class="dash-empty" style="margin:0;">Conta leads fechados pelo histórico (status Fechado) ou pela Situação: ganho ÷ (ganho + perdido).</span>
+    </div>
+    <div class="table-scroll"><table class="admin-table">
+      <thead><tr><th>Quem fechou</th><th class="num">Ganhos</th><th class="num">Perdidos</th><th class="num">Encerrados</th><th class="num">Taxa de fechamento</th></tr></thead>
+      <tbody id="efet-tbody"><tr><td colspan="5">Carregando...</td></tr></tbody>
+    </table></div>
+    <p class="dash-empty" style="margin-top:8px;">"Sem registro" são leads que já vieram como ganho/perdido (importados) ou fechados antes deste controle: não se sabe quem fechou nem quando.</p>
+  </div>
+
   <div class="bi-section">Novo cliente</div>
   <div class="bi-card">
     <form class="dash-quick-form dash-novo" id="novo-form">

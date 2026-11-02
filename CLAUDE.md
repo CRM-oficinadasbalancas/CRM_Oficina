@@ -21,7 +21,7 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
 - `clientes`: nome + (telefone ou e-mail); `categoria` (venda | manutencao | pos_venda | null) define o funil;
   `situacao` (ativo | ganho | perdido); `canal_aquisicao`; `origem` (manual | importacao — importados não geram alertas).
 - `cliente_historico`: anotação + `resultado` (positivo/negativo, alimenta a cadência e o alerta de 3 negativas) + `status`
-  (aberto | pendente | continuacao | fechado, só etiqueta, não muda prazo).
+  (aberto | pendente | continuacao | fechado). Salvar uma anotação com status Fechado exige o resultado e encerra o lead: positivo = ganho, negativo = perdido (cliente-detalhe.js, com confirmação). O banco registra `clientes.encerrado_em/encerrado_por/encerrado_por_nome` (migration 0018) e o dashboard mostra a efetividade por quem fechou.
 - Cadência (`admin/js/prazos.js`, com port fiel em TS na edge function): Vendas 24/72/120h; Manutenção 60 dias após fechar,
   ou cadência de Vendas se não fechou; Pós-venda 30 dias (+30 se negativo). Lead ganho/perdido = concluído.
 - Alertas por e-mail ao gerente: 12 horas úteis de atraso (seg–sex 8–18, almoço 13–14) e 3 negativas seguidas.
@@ -57,5 +57,5 @@ Derivado do CRP genérico. **Nunca mexer no CRP nem no HLN** — este repositór
    técnico = clientes/histórico + AT/equipamentos/estoque; profiles só admin (cada um edita o próprio sem mudar role); alertas_enviados só service_role.
    Falta: testar cada tela logado com um usuário Técnico e um Atendente de verdade.
 5. Ligar a proteção contra senhas vazadas no Supabase Auth; avaliar Pro/keep-alive por causa da pausa do free tier.
-6. Decidir se status "Fechado" deve encerrar o lead (ganho/perdido) automaticamente.
+6. (feito) Status "Fechado" encerra o lead como ganho/perdido. Pendente de decisão: manutenção preventiva 60 dias após ganho em Manutenção (hoje o ganho encerra o acompanhamento).
 7. Testar as telas logado com dados reais (só foi testado com dados simulados).

@@ -38,6 +38,7 @@ function garantirModalDetalhe() {
         '</select></div>' +
         '<div class="form-field"><label for="det-situacao">Situação</label><select id="det-situacao"></select></div>' +
       '</div>' +
+      '<p id="det-encerramento" class="hint" style="margin:6px 0 0; font-weight:600;"></p>' +
       '<p id="det-erro" class="error-message" style="display:none;"></p>' +
       '<div class="form-actions" style="margin-bottom:8px;">' +
         '<button type="button" class="btn btn-primary" id="det-salvar">Salvar dados</button>' +
@@ -112,6 +113,17 @@ function configurarResultadoDetalhe() {
     '<option value="negativo">' + labels.negativo + '</option>';
 }
 
+// Linha "Ganho em 02/11/2026 por Fulano" na ficha (registrada pelo banco quando a situação muda).
+function mostrarEncerramentoDetalhe(c) {
+  var el = document.getElementById('det-encerramento');
+  if (!el) return;
+  if (!c || (c.situacao !== 'ganho' && c.situacao !== 'perdido')) { el.textContent = ''; return; }
+  var rotulo = c.situacao === 'ganho' ? 'Ganho' : 'Perdido';
+  el.textContent = c.encerrado_em
+    ? rotulo + ' em ' + new Date(c.encerrado_em).toLocaleDateString('pt-BR') + (c.encerrado_por_nome ? ' por ' + c.encerrado_por_nome : '')
+    : rotulo + ' (registro anterior, sem data de fechamento)';
+}
+
 function fecharClienteDetalhe() {
   document.getElementById('modal-cliente-detalhe').classList.remove('open');
 }
@@ -134,6 +146,7 @@ async function abrirClienteDetalhe(clienteId, opcoes) {
   document.getElementById('det-canal').innerHTML = opcoesCanalHtml(data.canal_aquisicao || '');
   document.getElementById('det-categoria').value = data.categoria || '';
   document.getElementById('det-situacao').innerHTML = opcoesSituacaoHtml(data.situacao || 'ativo');
+  mostrarEncerramentoDetalhe(data);
   document.getElementById('det-tipo').value = String(!!data.eh_cliente);
   atualizarCamposDetalhePorTipo();
   var linkCadastro = document.getElementById('det-cadastro');
@@ -215,6 +228,9 @@ async function salvarDadosDetalhe() {
   if (error) { erroEl.textContent = 'Erro ao salvar: ' + error.message; erroEl.style.display = 'block'; return; }
   detalheCliente.situacao = situacaoNova;
   document.getElementById('det-situacao').value = situacaoNova;
+  var enc = await supabaseClient.from('clientes').select('encerrado_em, encerrado_por_nome').eq('id', detalheCliente.id).single();
+  if (enc.data) { Object.assign(detalheCliente, enc.data); }
+  mostrarEncerramentoDetalhe(detalheCliente);
   document.getElementById('det-categoria').value = categoriaFinal || '';
   atualizarCamposDetalhePorTipo();
   document.getElementById('det-titulo').textContent = nome;
@@ -231,6 +247,20 @@ async function salvarInformacaoDetalhe() {
   var sessao = await supabaseClient.auth.getSession();
   var autorId = sessao.data && sessao.data.session ? sessao.data.session.user.id : null;
 
+  // Status "Fechado" encerra o lead: o resultado define Ganho (positivo) ou Perdido (negativo).
+  var statusNota = document.getElementById('det-status').value;
+  var encerrar = null;
+  if (statusNota === 'fechado' && RESULTADO_LABELS_POR_CATEGORIA[categoria]) {
+    if (!resultado) { showToast('Para fechar, escolha o resultado do contato (positivo ou negativo).', 'warning'); return; }
+    if (detalheCliente.situacao === 'ativo') {
+      encerrar = resultado === 'positivo' ? 'ganho' : 'perdido';
+      var msg = encerrar === 'ganho'
+        ? 'Fechar como GANHO? O lead sai do acompanhamento e conta na sua taxa de fechamento.'
+        : 'Fechar como PERDIDO? O lead sai do acompanhamento e conta na sua taxa de fechamento.';
+      if (!confirm(msg)) return;
+    }
+  }
+
   var btn = document.getElementById('det-add-salvar');
   btn.disabled = true;
   var { error } = await supabaseClient.from('cliente_historico').insert({
@@ -243,7 +273,29 @@ async function salvarInformacaoDetalhe() {
   btn.disabled = false;
 
   if (error) { showToast('Erro ao salvar informação: ' + error.message, 'error'); return; }
-  showToast('Informação registrada.', 'ok');
+
+  if (encerrar) {
+    var campos = { situacao: encerrar };
+    if (encerrar === 'ganho' && !detalheCliente.eh_cliente &&
+        confirm('Este lead virou cliente. Migrar para a Assistência Técnica (marcar como Cliente da Oficina)?')) {
+      campos.eh_cliente = true;
+    }
+    var up = await supabaseClient.from('clientes').update(campos).eq('id', detalheCliente.id)
+      .select('situacao, eh_cliente, encerrado_em, encerrado_por_nome').single();
+    if (up.error) {
+      showToast('Informação registrada, mas não foi possível encerrar o lead: ' + up.error.message, 'error');
+    } else {
+      Object.assign(detalheCliente, up.data);
+      document.getElementById('det-situacao').value = up.data.situacao;
+      var tipoEl = document.getElementById('det-tipo');
+      if (tipoEl) tipoEl.value = up.data.eh_cliente ? 'true' : 'false';
+      if (typeof atualizarCamposDetalhePorTipo === 'function') atualizarCamposDetalhePorTipo();
+      mostrarEncerramentoDetalhe(up.data);
+      showToast('Lead fechado como ' + (encerrar === 'ganho' ? 'GANHO' : 'PERDIDO') + '.', 'ok');
+    }
+  } else {
+    showToast('Informação registrada.', 'ok');
+  }
   mostrarAddInfo(false);
   carregarHistoricoDetalhe();
   avisarMudancaDetalhe();
