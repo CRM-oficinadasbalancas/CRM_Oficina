@@ -73,17 +73,29 @@ function opcoesClientes(filtroTxt) {
   $('n-cliente').innerHTML = '<option value="">— Selecione (' + lista.length + ') —</option>' + lista.map(function (c) {
     return '<option value="' + c.id + '">' + esc(c.razao_social) + (c.nome_fantasia ? ' (' + esc(c.nome_fantasia) + ')' : '') + '</option>';
   }).join('');
-  carregarEquip('');
 }
 
-async function carregarEquip(clienteId) {
+function normTxt(v) { return String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+
+// Lista geral de modelos de balança (marca + modelo): vem de todos os equipamentos já cadastrados,
+// vale para qualquer cliente. O nº de série é informado em cada chamado.
+var catalogo = [];
+async function carregarCatalogo() {
+  var r = await supabaseClient.from('equipamentos').select('marca, modelo').order('created_at', { ascending: false }).limit(5000);
+  var vistos = {};
+  catalogo = [];
+  (r.data || []).forEach(function (e) {
+    if (!e.marca && !e.modelo) return;
+    var k = normTxt(e.marca) + '|' + normTxt(e.modelo);
+    if (vistos[k]) return;
+    vistos[k] = true;
+    catalogo.push({ marca: e.marca || '', modelo: e.modelo || '' });
+  });
+  catalogo.sort(function (a, b) { return ((a.marca + ' ' + a.modelo).toLowerCase()).localeCompare((b.marca + ' ' + b.modelo).toLowerCase()); });
+  $('n-equip').innerHTML = '<option value="">— Selecione —</option>' + catalogo.map(function (m, i) {
+    return '<option value="' + i + '">' + esc([m.marca, m.modelo].filter(Boolean).join(' ')) + '</option>';
+  }).join('') + '<option value="__novo">+ Cadastrar novo modelo</option>';
   $('n-equip-novo').hidden = true;
-  if (!clienteId) { $('n-equip').innerHTML = '<option value="">Escolha o cliente primeiro</option>'; return; }
-  var r = await supabaseClient.from('equipamentos').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false });
-  equipamentos = r.data || [];
-  $('n-equip').innerHTML = '<option value="">— Selecione —</option>' + equipamentos.map(function (e) {
-    return '<option value="' + e.id + '">' + esc([e.marca, e.modelo].filter(Boolean).join(' ') || 'Equipamento') + ' · série ' + esc(e.numero_serie) + '</option>';
-  }).join('') + '<option value="__novo">+ Cadastrar novo equipamento</option>';
 }
 
 function tipoDoTecnico(id) {
@@ -111,6 +123,7 @@ async function abrirNovo() {
   var r = await supabaseClient.from('clientes').select('id, razao_social, nome_fantasia').eq('eh_cliente', true).order('razao_social');
   clientes = r.data || [];
   opcoesClientes('');
+  await carregarCatalogo();
   var t = await supabaseClient.rpc('listar_tecnicos');
   tecnicos = t.data || tecnicos;
   function grupo(rotulo, role) {
@@ -132,16 +145,24 @@ $('n-selo-aus').addEventListener('change', function () { $('n-selo').disabled = 
 $('n-lacre-aus').addEventListener('change', function () { $('n-lacre').disabled = this.checked; if (this.checked) $('n-lacre').value = ''; });
 $('n-tecnico').addEventListener('change', atualizarTipoNovo);
 $('n-cli-busca').addEventListener('input', function () { opcoesClientes(this.value); });
-$('n-cliente').addEventListener('change', function () { carregarEquip(this.value); });
 $('n-equip').addEventListener('change', function () { $('n-equip-novo').hidden = this.value !== '__novo'; });
 $('n-cancelar').addEventListener('click', function () { $('modal-novo').classList.remove('open'); });
 
 $('n-salvar').addEventListener('click', async function () {
   $('novo-erro').hidden = true;
-  var clienteId = $('n-cliente').value, equipId = $('n-equip').value, defeito = $('n-defeito').value.trim();
+  var clienteId = $('n-cliente').value, eqSel = $('n-equip').value, defeito = $('n-defeito').value.trim();
   if (!clienteId) return erroNovo('Selecione o cliente.');
-  if (!equipId) return erroNovo('Selecione (ou cadastre) o equipamento.');
-  if (!defeito) return erroNovo('Informe o defeito.');
+  if (!eqSel) return erroNovo('Selecione o modelo da balança (ou cadastre um novo modelo).');
+  var marca, modelo;
+  if (eqSel === '__novo') {
+    marca = $('n-eq-marca').value.trim(); modelo = $('n-eq-modelo').value.trim();
+    if (!marca || !modelo) return erroNovo('Informe a marca e o modelo da balança.');
+  } else {
+    var m = catalogo[parseInt(eqSel, 10)]; marca = m.marca; modelo = m.modelo;
+  }
+  var ns = chNormalizarSerie($('n-eq-serie-aus').checked ? CH_SEM_SERIE : $('n-eq-serie').value);
+  if (ns.erro) return erroNovo(ns.erro);
+  if (!defeito) return erroNovo('Informe o defeito do equipamento.');
   if (!$('n-tecnico').value) return erroNovo('Escolha o técnico — ele define se o chamado é de campo ou da oficina interna.');
   atualizarTipoNovo();
   var campos = { cliente_id: clienteId, descricao_defeito: defeito, tipo: tipoNovo, tecnico_id: $('n-tecnico').value };
@@ -161,11 +182,15 @@ $('n-salvar').addEventListener('click', async function () {
   }
 
   var btn = this; btn.disabled = true;
-  if (equipId === '__novo') {
-    var ns = chNormalizarSerie($('n-eq-serie-aus').checked ? CH_SEM_SERIE : $('n-eq-serie').value);
-    if (ns.erro) { btn.disabled = false; return erroNovo(ns.erro); }
-    var serie = ns.valor;
-    var eq = await supabaseClient.from('equipamentos').insert({ cliente_id: clienteId, marca: $('n-eq-marca').value.trim() || null, modelo: $('n-eq-modelo').value.trim() || null, numero_serie: serie, created_by: meuId }).select().single();
+  // reaproveita a mesma balança (modelo + série) do cliente; sem série ("NÃO CONSTA") sempre cria um registro novo
+  var equipId = null;
+  if (ns.valor !== CH_SEM_SERIE) {
+    var ja = await supabaseClient.from('equipamentos').select('id, marca, modelo').eq('cliente_id', clienteId).eq('numero_serie', ns.valor);
+    var igual = (ja.data || []).find(function (e) { return normTxt(e.marca) === normTxt(marca) && normTxt(e.modelo) === normTxt(modelo); });
+    if (igual) equipId = igual.id;
+  }
+  if (!equipId) {
+    var eq = await supabaseClient.from('equipamentos').insert({ cliente_id: clienteId, marca: marca, modelo: modelo, numero_serie: ns.valor, created_by: meuId }).select().single();
     if (eq.error) { btn.disabled = false; return erroNovo('Erro ao cadastrar equipamento: ' + eq.error.message); }
     equipId = eq.data.id;
   }

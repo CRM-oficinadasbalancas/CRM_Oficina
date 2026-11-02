@@ -91,14 +91,15 @@
       <select id="n-cliente" style="margin-top:6px;"></select>
       <span class="hint">Só clientes da Oficina. Não achou? <a href="clientes.html" style="color:#d93035; font-weight:600;">Cadastre o cliente</a>.</span>
     </div>
-    <div class="form-field"><label for="n-equip">Equipamento *</label><select id="n-equip"></select></div>
+    <div class="form-field"><label for="n-equip">Modelo da balança *</label><select id="n-equip"></select>
+      <span class="hint">Lista geral: os modelos já cadastrados servem para qualquer cliente. Não achou? Escolha "+ Cadastrar novo modelo".</span></div>
     <div id="n-equip-novo" class="ch-painel" hidden>
-      <div class="form-field"><label for="n-eq-marca">Marca</label><input type="text" id="n-eq-marca" maxlength="100"></div>
-      <div class="form-field"><label for="n-eq-modelo">Modelo</label><input type="text" id="n-eq-modelo" maxlength="100"></div>
-      <div class="form-field"><label for="n-eq-serie">Nº de série *</label><input type="text" id="n-eq-serie" maxlength="20" placeholder="Letras e números, até 20" autocapitalize="characters">
+      <div class="form-field"><label for="n-eq-marca">Marca *</label><input type="text" id="n-eq-marca" maxlength="100"></div>
+      <div class="form-field"><label for="n-eq-modelo">Modelo *</label><input type="text" id="n-eq-modelo" maxlength="100"></div>
+    </div>
+    <div class="form-field"><label for="n-eq-serie">Nº de série *</label><input type="text" id="n-eq-serie" maxlength="20" placeholder="Letras e números, até 20" autocapitalize="characters">
         <label class="check-linha"><input type="checkbox" id="n-eq-serie-aus"> A balança não possui número de série</label>
         <span class="hint" style="color:#b4251f;">Atenção: a palavra <b>NÃO CONSTA</b> só é permitida quando a balança realmente não possui número de série. Caso contrário, digite o número (só letras e números).</span></div>
-    </div>
     <div class="form-field"><label for="n-defeito">Defeito *</label><textarea id="n-defeito" rows="3" maxlength="5000"></textarea></div>
 
     <div class="form-field"><label for="n-tecnico">Atribuir ao técnico *</label><select id="n-tecnico"></select>
