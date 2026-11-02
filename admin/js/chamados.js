@@ -15,13 +15,13 @@ function equipTxt(c) { var e = c.equipamentos || {}; return ([e.marca, e.modelo]
 var SEL = '*, clientes(razao_social, telefone_empresa, logradouro, numero, bairro, municipio, uf, latitude, longitude), equipamentos(marca, modelo, numero_serie)';
 
 var FILTROS = [
-  { id: 'abertos', rotulo: 'Em aberto', fn: function (c) { return ['aberta', 'em_andamento', 'pendente', 'orcamento_aprovado'].indexOf(c.status) !== -1; } },
+  { id: 'abertos', rotulo: 'Em aberto', fn: function (c) { return ['aberta', 'em_andamento', 'pendente', 'orcamento_aprovado', 'nao_aprovada'].indexOf(c.status) !== -1; } },
   { id: 'campo', rotulo: 'Campo', fn: function (c) { return c.tipo === 'campo' && ['aberta', 'em_andamento'].indexOf(c.status) !== -1; } },
   { id: 'orcamento', rotulo: 'Aguardando orçamento', fn: function (c) { return c.status === 'pendente'; } },
   { id: 'aprovados', rotulo: 'Orçamento aprovado', fn: function (c) { return c.status === 'orcamento_aprovado'; } },
   { id: 'faturar', rotulo: 'A faturar', fn: chAFaturar },
   { id: 'faturados', rotulo: 'Faturados', fn: function (c) { return !!c.faturado_em; } },
-  { id: 'oficina', rotulo: 'Oficina interna', fn: function (c) { return c.tipo === 'oficina' && ['orcamento_aprovado', 'em_andamento'].indexOf(c.status) !== -1; } },
+  { id: 'oficina', rotulo: 'Na oficina', fn: function (c) { return c.tipo === 'oficina' && ['aberta', 'em_andamento', 'orcamento_aprovado', 'nao_aprovada'].indexOf(c.status) !== -1; } },
   { id: 'fechados', rotulo: 'Fechados', fn: function (c) { return c.status === 'concluida'; } },
   { id: 'recusados', rotulo: 'Recusados', fn: function (c) { return c.status === 'nao_aprovada'; } },
   { id: 'todos', rotulo: 'Todos', fn: function () { return true; } }
@@ -35,9 +35,10 @@ var FILTROS_POR_PAPEL = {
     { id: 'fechados', rotulo: 'Fechados', fn: function (c) { return c.status === 'concluida'; } }
   ],
   oficina_interna: [
-    { id: 'abertos', rotulo: 'Em aberto', fn: function (c) { return c.tipo === 'oficina' && ['pendente', 'orcamento_aprovado', 'em_andamento'].indexOf(c.status) !== -1; } },
+    { id: 'abertos', rotulo: 'Em aberto (na oficina)', fn: function (c) { return c.tipo === 'oficina' && ['aberta', 'em_andamento', 'orcamento_aprovado', 'nao_aprovada'].indexOf(c.status) !== -1; } },
     { id: 'orcamento', rotulo: 'Aguardando orçamento', fn: function (c) { return c.status === 'pendente'; } },
     { id: 'aprovados', rotulo: 'Orçamento aprovado', fn: function (c) { return c.status === 'orcamento_aprovado'; } },
+    { id: 'recusados', rotulo: 'Orçamento recusado', fn: function (c) { return c.status === 'nao_aprovada'; } },
     { id: 'fechados', rotulo: 'Fechados', fn: function (c) { return c.status === 'concluida'; } }
   ]
 };
@@ -78,7 +79,7 @@ function desenharLista() {
     return '<tr class="ch-linha" data-id="' + c.id + '"><td><b>' + c.numero + '</b></td><td>' + fmtData(c.created_at) + '</td><td>' + esc(c.clientes ? c.clientes.razao_social : '—') +
       '</td><td>' + esc(equipTxt(c)) + '</td><td>' + esc((c.descricao_defeito || '').slice(0, 90)) + '</td><td>' + agenda +
       '</td><td><span class="ch-st st-' + c.status + '">' + CH_STATUS_CURTO[c.status] + '</span>' +
-      (chAFaturar(c) ? '<br><small style="color:#b4251f; font-weight:700;">A faturar</small>' : (c.faturado_em ? '<br><small>Faturado ' + fmtData(c.faturado_em) + '</small>' : '')) + '</td></tr>';
+      (chAFaturar(c) ? '<br><small style="color:#b4251f; font-weight:700;">A faturar</small>' : (c.faturado_em ? '<br><small>Faturado ' + fmtData(c.faturado_em) + '</small>' : (c.devolvido ? '<br><small>Devolvido ao cliente</small>' : ''))) + '</td></tr>';
   }).join('');
   $('ch-tbody').querySelectorAll('.ch-linha').forEach(function (tr) {
     tr.addEventListener('click', function () { abrirDetalhe(tr.dataset.id); });
@@ -198,7 +199,7 @@ $('n-salvar').addEventListener('click', async function () {
     if (erros.length) return erroNovo(erros[0]);
     campos.selo_antigo = selo || null; campos.selo_antigo_ausente = $('n-selo-aus').checked;
     campos.lacre_antigo = lacre || null; campos.lacre_antigo_ausente = $('n-lacre-aus').checked;
-    campos.status = 'pendente';
+    campos.status = 'aberta';
   }
 
   var btn = this; btn.disabled = true;
@@ -218,7 +219,7 @@ $('n-salvar').addEventListener('click', async function () {
   var r = await supabaseClient.from('assistencias_tecnicas').insert(campos).select().single();
   btn.disabled = false;
   if (r.error) return erroNovo('Erro ao abrir o chamado: ' + r.error.message);
-  await chHistorico(r.data.id, meuId, 'nota', campos.status, tipoNovo === 'campo' ? 'Chamado de campo aberto e programado.' : 'Equipamento recebido na oficina interna — aguardando orçamento.');
+  await chHistorico(r.data.id, meuId, 'nota', campos.status, tipoNovo === 'campo' ? 'Chamado de campo aberto e programado.' : 'Equipamento recebido na oficina interna.');
   $('modal-novo').classList.remove('open');
   showToast('Chamado Nº ' + r.data.numero + ' aberto.', 'ok');
   carregar();
@@ -245,14 +246,15 @@ function desenharDetalhe() {
     '<div><b>Endereço</b>' + (end ? esc(end) + (mapa ? ' <a href="' + mapa + '" target="_blank" rel="noopener" style="color:#d93035;">mapa</a>' : '') : '—') + '</div>' +
     '<div><b>Equipamento</b>' + esc(equipTxt(c)) + '</div>' +
     '<div><b>Abertura</b>' + fmtData(c.created_at) + '</div>' +
-    (c.status === 'concluida' && c.orcamento_em ? '<div><b>Faturamento</b>' + (c.faturado_em ? 'Faturado em ' + fmtData(c.faturado_em) : '<span style="color:#b4251f; font-weight:700;">A faturar (recepção)</span>') + '</div>' : '') +
+    (c.status === 'concluida' && c.devolvido ? '<div><b>Encerramento</b>Devolvido ao cliente sem conserto</div>' : '') +
+    (c.status === 'concluida' && c.tipo === 'oficina' && !c.devolvido ? '<div><b>Faturamento</b>' + (c.faturado_em ? 'Faturado em ' + fmtData(c.faturado_em) : '<span style="color:#b4251f; font-weight:700;">A faturar (recepção)</span>') + '</div>' : '') +
     '<div><b>Técnico / visita</b>' + (c.tecnico_id ? esc(nomeTecnico(c.tecnico_id)) + (c.tipo === 'campo' ? ' · ' + fmtDia(c.data_agendada) : '') : '—') + '</div>' +
     '<div style="grid-column:1/-1;"><b>Defeito</b>' + esc(c.descricao_defeito) + '</div>' +
     '<div><b>Selo antigo</b>' + (c.selo_antigo_ausente ? 'Não possui' : esc(c.selo_antigo || '—')) + '</div>' +
     '<div><b>Selo novo</b>' + esc(c.selo_novo || '—') + '</div>' +
     '<div><b>Lacre antigo</b>' + (c.lacre_antigo_ausente ? 'Não possui' : esc(c.lacre_antigo || '—')) + '</div>' +
     '<div><b>Lacre novo</b>' + esc(c.lacre_novo || '—') + '</div>';
-  var rot = { iniciar: 'Iniciar atendimento', pendencia: c.tipo === 'oficina' ? 'Voltar para Pendente' : 'Pendência / enviar para oficina', fechar: 'Fechar chamado', aprovar: 'Orçamento aprovado', recusar: 'Orçamento recusado', agendar: 'Reprogramar', anotar: 'Adicionar anotação', faturar: 'Marcar como faturado' };
+  var rot = { iniciar: 'Iniciar atendimento', pendencia: 'Transferir para a oficina interna', fechar: 'Fechar chamado', aprovar: 'Orçamento aprovado', recusar: 'Orçamento recusado', agendar: 'Reprogramar', anotar: 'Adicionar anotação', faturar: 'Marcar como faturado', devolver: 'Fechar e devolver ao cliente' };
   var acoes = chAcoes(papel, c);
   $('d-acoes').innerHTML = acoes.map(function (a) {
     return '<button type="button" class="btn ' + (a === 'recusar' || a === 'anotar' ? 'btn-outline' : 'btn-primary') + '" data-a="' + a + '">' + rot[a] + '</button>';
@@ -323,9 +325,18 @@ async function painelAcao(acao) {
     p.innerHTML = '<div class="ch-painel"><p>Confirma que o serviço deste chamado foi <b>faturado</b>?</p>' +
       '<div class="form-field"><label for="a-nota">Observação (opcional) — nº da nota, pedido ou forma de cobrança</label><textarea id="a-nota" rows="2" maxlength="500"></textarea></div>' + erroEl + btnOk + '</div>';
     $('a-ok').onclick = function () { executar(function () { return chFaturar(c, meuId, $('a-nota').value); }); };
+  } else if (acao === 'devolver') {
+    p.innerHTML = '<div class="ch-painel"><p>Orçamento <b>recusado</b>: feche o chamado e devolva o equipamento ao cliente. Os <b>selos e lacres continuam os antigos</b> (não é preciso informar novos).</p>' +
+      '<div class="form-field"><label for="a-nota">Observação da devolução *</label><textarea id="a-nota" rows="2" maxlength="5000"></textarea></div>' + erroEl + btnOk + '</div>';
+    $('a-ok').onclick = function () { executar(function () { return chDevolver(c, meuId, $('a-nota').value); }); };
   } else if (acao === 'anotar') {
-    p.innerHTML = '<div class="ch-painel"><div class="form-field"><label for="a-nota">Anotação * — diagnóstico, observação ou andamento</label><textarea id="a-nota" rows="3" maxlength="5000"></textarea></div>' + erroEl + btnOk + '</div>';
+    var podeOrc = chPodeEnviarOrcamento(papel, c);
+    p.innerHTML = '<div class="ch-painel"><div class="form-field"><label for="a-nota">Anotação * — ' + (podeOrc ? 'diagnóstico e o que precisa de orçamento (peças, mão de obra)' : 'diagnóstico, observação ou andamento') + '</label><textarea id="a-nota" rows="3" maxlength="5000"></textarea></div>' + erroEl +
+      '<div class="form-actions"><button type="button" class="btn btn-outline" id="a-ok">Salvar anotação</button>' +
+      (podeOrc ? '<button type="button" class="btn btn-primary" id="a-orc">Enviar para orçamento (recepção)</button>' : '') + '</div>' +
+      (podeOrc ? '<span class="hint">"Enviar para orçamento" salva a anotação e passa o chamado para a recepção falar com o cliente. Depois da resposta ele volta para a fila da oficina.</span>' : '') + '</div>';
     $('a-ok').onclick = function () { executar(function () { return chAnotar(c, meuId, $('a-nota').value); }); };
+    if (podeOrc) $('a-orc').onclick = function () { executar(function () { return chEnviarOrcamento(c, meuId, $('a-nota').value); }); };
   } else if (acao === 'aprovar' || acao === 'recusar') {
     var aprova = acao === 'aprovar';
     p.innerHTML = '<div class="ch-painel"><p>' + (aprova ? 'Orçamento <b>aprovado</b>: o equipamento segue para a oficina interna.' : 'Orçamento <b>recusado</b>: o equipamento não será consertado e deve ser devolvido ao cliente.') + '</p>' +
@@ -347,10 +358,10 @@ async function painelAcao(acao) {
 }
 
 async function executar(fn) {
-  var erroEl = $('a-erro'), btn = $('a-ok');
-  erroEl.hidden = true; btn.disabled = true;
+  var erroEl = $('a-erro'), botoes = $('d-painel').querySelectorAll('button');
+  erroEl.hidden = true; botoes.forEach(function (b) { b.disabled = true; });
   var r = await fn();
-  btn.disabled = false;
+  botoes.forEach(function (b) { b.disabled = false; });
   if (r.erro) { erroEl.textContent = r.erro; erroEl.hidden = false; return; }
   showToast('Chamado atualizado.', 'ok');
   var idAtual = atual.id;

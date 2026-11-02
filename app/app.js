@@ -89,9 +89,9 @@ var SEL = '*, clientes(razao_social, telefone_empresa, logradouro, numero, bairr
 // aguardando orçamento, orçamento aprovado e fechados.
 var ABAS = {
   tecnico: [{ id: 'abertos', t: 'Em aberto' }, { id: 'fechados', t: 'Fechados' }],
-  oficina_interna: [{ id: 'abertos', t: 'Em aberto' }, { id: 'orcamento', t: 'Aguardando orçamento' }, { id: 'aprovados', t: 'Orçamento aprovado' }, { id: 'fechados', t: 'Fechados' }]
+  oficina_interna: [{ id: 'abertos', t: 'Em aberto' }, { id: 'orcamento', t: 'Aguardando orçamento' }, { id: 'aprovados', t: 'Orçamento aprovado' }, { id: 'recusados', t: 'Orçamento recusado' }, { id: 'fechados', t: 'Fechados' }]
 };
-var ABA_TITULO = { abertos: 'Em aberto', orcamento: 'Aguardando orçamento', aprovados: 'Orçamento aprovado', fechados: 'Fechados (últimos 100)' };
+var ABA_TITULO = { abertos: 'Em aberto', orcamento: 'Aguardando orçamento', aprovados: 'Orçamento aprovado', recusados: 'Orçamento recusado — devolver ao cliente', fechados: 'Fechados (últimos 100)' };
 
 function desenharAbas() {
   var abas = ABAS[estado.perfil.role];
@@ -118,7 +118,8 @@ async function carregarAgenda() {
     if (aba === 'fechados') q = q.eq('status', 'concluida');
     else if (aba === 'orcamento') q = q.eq('status', 'pendente');
     else if (aba === 'aprovados') q = q.eq('status', 'orcamento_aprovado');
-    else q = q.in('status', ['pendente', 'orcamento_aprovado', 'em_andamento']);
+    else if (aba === 'recusados') q = q.eq('status', 'nao_aprovada');
+    else q = q.in('status', ['aberta', 'em_andamento', 'orcamento_aprovado', 'nao_aprovada']);
   } else {
     q = q.in('status', ['aberta', 'em_andamento', 'orcamento_aprovado']);
   }
@@ -281,7 +282,7 @@ function desenharChamado() {
     (c.selo_antigo || c.selo_antigo_ausente ? '<div class="par"><b>Selo antigo</b>' + (c.selo_antigo_ausente ? 'Não possui' : esc(c.selo_antigo)) + '</div>' : '') +
     (c.lacre_antigo || c.lacre_antigo_ausente ? '<div class="par"><b>Lacre antigo</b>' + (c.lacre_antigo_ausente ? 'Não possui' : esc(c.lacre_antigo)) + '</div>' : '');
 
-  var rot = { iniciar: 'Iniciar atendimento', pendencia: c.tipo === 'oficina' ? 'Voltar para Pendente' : 'Pendente — enviar para a oficina', fechar: 'Fechar chamado', anotar: 'Adicionar anotação' };
+  var rot = { iniciar: 'Iniciar atendimento', pendencia: 'Transferir para a oficina interna', fechar: 'Fechar chamado', anotar: 'Adicionar anotação', devolver: 'Fechar e devolver ao cliente' };
   var acoes = chAcoes(estado.perfil.role, c).filter(function (a) { return rot[a]; });
   $('ch-acoes').innerHTML = acoes.map(function (a) {
     return '<button type="button" class="btn ' + (a === 'pendencia' || a === 'anotar' ? 'btn-escuro' : 'btn-vermelho') + ' btn-bloco" data-a="' + a + '">' + rot[a] + '</button>';
@@ -330,14 +331,22 @@ async function formAcao(acao) {
   if (acao === 'iniciar') {
     box.innerHTML = '<div class="caixa"><p>Iniciar o atendimento agora?</p>' + rodape + '</div>';
     $('f-ok').onclick = function () { executar(function () { return chIniciar(c, estado.sessao.user.id); }, 'Atendimento iniciado.', true); };
+  } else if (acao === 'devolver') {
+    box.innerHTML = '<div class="caixa"><p>Orçamento <b>recusado</b>: feche o chamado e devolva o equipamento ao cliente. Os <b>selos e lacres continuam os antigos</b>.</p>' +
+      '<label for="f-hist">Observação da devolução *</label><textarea id="f-hist" rows="3" maxlength="5000"></textarea>' + rodape + '</div>';
+    $('f-ok').onclick = function () { executar(function () { return chDevolver(c, estado.sessao.user.id, $('f-hist').value); }, 'Equipamento devolvido. Chamado fechado.', false); };
   } else if (acao === 'anotar') {
-    box.innerHTML = '<div class="caixa"><label for="f-hist">Anotação * — diagnóstico, observação ou andamento</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' + rodape + '</div>';
+    var podeOrc = chPodeEnviarOrcamento(estado.perfil.role, c);
+    box.innerHTML = '<div class="caixa"><label for="f-hist">Anotação * — ' + (podeOrc ? 'diagnóstico e o que precisa de orçamento' : 'diagnóstico, observação ou andamento') + '</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' +
+      '<p class="erro" id="f-erro" hidden></p><button type="button" class="btn btn-escuro btn-bloco" id="f-ok">Salvar anotação</button>' +
+      (podeOrc ? '<button type="button" class="btn btn-vermelho btn-bloco" id="f-orc" style="margin-top:8px;">Enviar para orçamento (recepção)</button><p class="dica">Passa o chamado para a recepção falar com o cliente. Depois da resposta ele volta para a sua fila.</p>' : '') + '</div>';
     $('f-ok').onclick = function () { executar(function () { return chAnotar(c, estado.sessao.user.id, $('f-hist').value); }, 'Anotação registrada.', true); };
+    if (podeOrc) $('f-orc').onclick = function () { executar(function () { return chEnviarOrcamento(c, estado.sessao.user.id, $('f-hist').value); }, 'Enviado para orçamento (recepção).', false); };
   } else if (acao === 'pendencia') {
     box.innerHTML = '<div class="caixa"><label for="f-hist">Histórico * — ' + (c.tipo === 'oficina' ? 'o que foi feito e por que volta para Pendente (ex.: aguardando orçamento ou peça)' : 'o que foi feito e por que vai para a oficina interna') + '</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' +
       '<details><summary>Selos e lacres (pode deixar em branco)</summary>' + vedacaoHtml(false) + '</details>' + rodape + '</div>';
     ligarFlags();
-    $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; executar(function () { return chPendencia(c, estado.sessao.user.id, v); }, (c.tipo === 'oficina' ? 'Chamado voltou para Pendente.' : 'Enviado para a oficina interna (aguardando orçamento).'), false); };
+    $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; executar(function () { return chPendencia(c, estado.sessao.user.id, v); }, (c.tipo === 'oficina' ? 'Chamado atualizado.' : 'Enviado para a oficina interna.'), false); };
   } else if (acao === 'fechar') {
     if (!estado.pecas.length) {
       var rp = await supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade').order('codigo');
@@ -355,10 +364,10 @@ async function formAcao(acao) {
 }
 
 async function executar(fn, msgOk, ficaNoChamado) {
-  var btn = $('f-ok'), erro = $('f-erro');
-  erro.hidden = true; btn.disabled = true; btn.textContent = 'Salvando...';
+  var btn = $('f-ok'), erro = $('f-erro'), botoes = $('ch-form').querySelectorAll('button'), textoOk = btn.textContent;
+  erro.hidden = true; botoes.forEach(function (b) { b.disabled = true; }); btn.textContent = 'Salvando...';
   var r = await fn();
-  btn.disabled = false; btn.textContent = 'Confirmar';
+  botoes.forEach(function (b) { b.disabled = false; }); btn.textContent = textoOk;
   if (r.erro) { erro.textContent = r.erro; erro.hidden = false; erro.scrollIntoView({ block: 'center' }); return; }
   avisar(msgOk, 'ok');
   if (ficaNoChamado) {

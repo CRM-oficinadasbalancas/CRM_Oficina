@@ -6,13 +6,13 @@
 var CH_STATUS = {
   aberta: 'Aberto',
   em_andamento: 'Em atendimento',
-  pendente: 'Pendente — oficina (aguardando orçamento)',
+  pendente: 'Aguardando orçamento (recepção)',
   orcamento_aprovado: 'Orçamento aprovado',
-  nao_aprovada: 'Orçamento recusado',
+  nao_aprovada: 'Orçamento recusado — devolver ao cliente',
   concluida: 'Fechado'
 };
 var CH_STATUS_CURTO = {
-  aberta: 'Aberto', em_andamento: 'Em atendimento', pendente: 'Pendente',
+  aberta: 'Aberto', em_andamento: 'Em atendimento', pendente: 'Aguard. orçamento',
   orcamento_aprovado: 'Orç. aprovado', nao_aprovada: 'Orç. recusado', concluida: 'Fechado'
 };
 var CH_ALFANUM = /^[A-Za-z0-9]{1,20}$/;
@@ -36,16 +36,17 @@ function chAcoes(papel, c) {
   var a = [];
   var s = c.status;
   var admin = papel === 'admin';
-  if (admin || papel === 'tecnico') {
+  // Técnico de rua: só chamados de campo (transferir para a oficina ou fechar).
+  if ((admin || papel === 'tecnico') && c.tipo === 'campo') {
     if (s === 'aberta') a.push('iniciar', 'pendencia');
-    if (s === 'em_andamento' && c.tipo === 'campo') a.push('pendencia', 'fechar');
+    if (s === 'em_andamento') a.push('pendencia', 'fechar');
   }
-  // Oficina interna controla o status dos chamados da oficina: iniciar, voltar a Pendente e fechar.
-  // (aprovar/recusar o orçamento continua só da recepção e da programação)
+  // Oficina interna: a fila dela é Aberto, Em atendimento e Orçamento aprovado. Para pedir orçamento usa
+  // "Adicionar anotação" + "Enviar para orçamento". Orçamento recusado: fecha e devolve o equipamento.
   if ((admin || papel === 'oficina_interna') && c.tipo === 'oficina') {
-    if (s === 'pendente' || s === 'orcamento_aprovado') a.push('iniciar');
-    if (s === 'orcamento_aprovado' || s === 'em_andamento') a.push('pendencia');
-    if (s === 'pendente' || s === 'orcamento_aprovado' || s === 'em_andamento') a.push('fechar');
+    if (s === 'aberta' || s === 'orcamento_aprovado') a.push('iniciar');
+    if (s === 'aberta' || s === 'em_andamento' || s === 'orcamento_aprovado') a.push('fechar');
+    if (s === 'nao_aprovada') a.push('devolver');
   }
   if (admin || papel === 'programadora' || papel === 'recepcao') {
     if (s === 'pendente') a.push('aprovar', 'recusar');
@@ -67,12 +68,12 @@ async function chHistorico(chamadoId, autorId, tipo, statusPara, texto) {
 async function chAtualizar(c, campos, autorId, tipoHist, texto) {
   var r = await supabaseClient.from('assistencias_tecnicas').update(campos).eq('id', c.id).select().single();
   if (r.error) return { erro: r.error.message };
-  if (texto) await chHistorico(c.id, autorId, tipoHist, campos.status, texto);
+  if (texto) await chHistorico(c.id, autorId, tipoHist, r.data.status, texto);
   return { chamado: r.data };
 }
 
-// Chamado da oficina já fechado que ainda não foi faturado.
-function chAFaturar(c) { return c.status === 'concluida' && c.tipo === 'oficina' && !c.faturado_em; }
+// Chamado da oficina já fechado que ainda não foi faturado (equipamento devolvido sem conserto não fatura).
+function chAFaturar(c) { return c.status === 'concluida' && c.tipo === 'oficina' && !c.devolvido && !c.faturado_em; }
 
 async function chFaturar(c, autorId, texto) {
   texto = (texto || '').trim();
@@ -80,6 +81,25 @@ async function chFaturar(c, autorId, texto) {
   if (r.error) return { erro: r.error.message };
   await chHistorico(c.id, autorId, 'nota', r.data.status, 'Serviço faturado.' + (texto ? ' ' + texto : ''));
   return { chamado: r.data };
+}
+
+// A oficina pode pedir orçamento a partir de uma anotação: o chamado vai para a recepção (Aguardando orçamento).
+function chPodeEnviarOrcamento(papel, c) {
+  return (papel === 'admin' || papel === 'oficina_interna') && c.tipo === 'oficina' &&
+    (c.status === 'aberta' || c.status === 'em_andamento' || c.status === 'orcamento_aprovado');
+}
+
+async function chEnviarOrcamento(c, autorId, texto) {
+  texto = (texto || '').trim();
+  if (!texto) return { erro: 'Escreva na anotação o que precisa de orçamento (peças, mão de obra, problema encontrado).' };
+  return chAtualizar(c, { status: 'pendente' }, autorId, 'pendencia', 'Enviado para orçamento (recepção): ' + texto);
+}
+
+// Orçamento recusado: a oficina fecha o chamado e devolve o equipamento. Selos e lacres continuam os antigos.
+async function chDevolver(c, autorId, texto) {
+  texto = (texto || '').trim();
+  if (!texto) return { erro: 'Escreva uma observação da devolução (ex.: equipamento devolvido ao cliente sem conserto).' };
+  return chAtualizar(c, { status: 'concluida', resolucao: texto }, autorId, 'fechamento', 'Equipamento devolvido ao cliente sem conserto (orçamento recusado). Selos e lacres continuam os antigos. ' + texto);
 }
 
 // Anotação livre no histórico do chamado (não muda status nem campos do chamado).
@@ -224,4 +244,4 @@ function chPorAbertura(lista) {
   return lista.slice().sort(function (a, b) { return new Date(a.created_at) - new Date(b.created_at); });
 }
 
-if (typeof module !== 'undefined') module.exports = { chAFaturar: chAFaturar, chOtimizarRota: chOtimizarRota, chKm: chKm, chUrlRota: chUrlRota, chAcoes: chAcoes, chPorAbertura: chPorAbertura, chCamposVedacao: chCamposVedacao };
+if (typeof module !== 'undefined') module.exports = { chPodeEnviarOrcamento: chPodeEnviarOrcamento, chAFaturar: chAFaturar, chOtimizarRota: chOtimizarRota, chKm: chKm, chUrlRota: chUrlRota, chAcoes: chAcoes, chPorAbertura: chPorAbertura, chCamposVedacao: chCamposVedacao };
