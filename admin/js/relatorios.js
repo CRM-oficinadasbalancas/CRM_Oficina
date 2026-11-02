@@ -1,15 +1,16 @@
 // Relatórios da Assistência Técnica (só admin):
-//   Consumo de peças · Chamados abertos · Backlog · Manutenção por defeito / peças
+//   Consumo e estoque de peças · Chamados abertos · Backlog · Manutenção por defeito / peças
 // O período (ano e, opcionalmente, mês) filtra pela data de ABERTURA do chamado.
 // O Backlog é a situação de hoje e não depende do período.
 
-var STATUS_LABELS = { aberta: 'Aberta', em_andamento: 'Em andamento', pendente: 'Pendente', concluida: 'Concluída', nao_aprovada: 'Não aprovado' };
-var STATUS_ABERTOS = ['aberta', 'em_andamento', 'pendente'];
+var STATUS_LABELS = { aberta: 'Aberto', em_andamento: 'Em atendimento', pendente: 'Pendente (aguardando orçamento)', orcamento_aprovado: 'Orçamento aprovado', concluida: 'Fechado', nao_aprovada: 'Orçamento recusado' };
+var STATUS_ABERTOS = ['aberta', 'em_andamento', 'pendente', 'orcamento_aprovado'];
 var MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 var abaAtual = 'consumo';
 var chamadosPeriodo = [];   // abertos no período (todos os status)
 var chamadosEmAberto = [];  // backlog: abertos hoje, qualquer data
+var pecasEstoque = [];      // todas as peças e o saldo de hoje
 var carregou = false;
 
 function esc(v) {
@@ -54,7 +55,8 @@ async function carregar() {
       .gte('created_at', p.ini.toISOString()).lt('created_at', p.fim.toISOString())
       .order('created_at', { ascending: false }).limit(5000),
     supabaseClient.from('assistencias_tecnicas').select(SELECT_CHAMADO)
-      .in('status', STATUS_ABERTOS).order('created_at', { ascending: true }).limit(5000)
+      .in('status', STATUS_ABERTOS).order('created_at', { ascending: true }).limit(5000),
+    supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade').order('codigo').limit(5000)
   ]);
   if (res[0].error || res[1].error) {
     $('painel').innerHTML = '<p class="rel-nota">Não foi possível carregar: ' + esc((res[0].error || res[1].error).message) + '</p>';
@@ -62,6 +64,7 @@ async function carregar() {
   }
   chamadosPeriodo = res[0].data || [];
   chamadosEmAberto = res[1].data || [];
+  pecasEstoque = res[2].data || [];
   carregou = true;
   desenhar();
 }
@@ -84,8 +87,22 @@ function tabela(colunas, linhas, vazio) {
 }
 
 /* ---------- 1) Consumo de peças ---------- */
+// Meses que o período cobre (para estimar a duração do estoque no ritmo de consumo).
+function mesesDoPeriodo() {
+  var ano = parseInt($('f-ano').value, 10);
+  if ($('f-mes').value) return 1;
+  var hoje = new Date();
+  if (ano < hoje.getFullYear()) return 12;
+  if (ano > hoje.getFullYear()) return 12;
+  return Math.max(1, hoje.getMonth() + 1);
+}
+
 function dadosConsumo() {
   var mapa = {};
+  // todas as peças do estoque entram, mesmo as que não foram usadas no período
+  pecasEstoque.forEach(function (p) {
+    mapa[p.id] = { codigo: p.codigo || '—', desc: p.tipo_modelo || '', usado: 0, chamados: 0, estoque: p.quantidade };
+  });
   chamadosPeriodo.forEach(function (c) {
     if (!c.peca_id || c.status === 'nao_aprovada') return;
     var q = parseFloat(c.quantidade_peca_utilizada) || 0;
@@ -95,28 +112,45 @@ function dadosConsumo() {
     mapa[c.peca_id].usado += q;
     mapa[c.peca_id].chamados += 1;
   });
-  return Object.keys(mapa).map(function (k) { return mapa[k]; }).sort(function (a, b) { return b.usado - a.usado; });
+  var meses = mesesDoPeriodo();
+  return Object.keys(mapa).map(function (k) {
+    var d = mapa[k];
+    d.porMes = d.usado / meses;
+    d.duraMeses = d.porMes > 0 ? (parseFloat(d.estoque) || 0) / d.porMes : null;
+    return d;
+  }).sort(function (a, b) { return b.usado - a.usado || String(a.codigo).localeCompare(String(b.codigo)); });
+}
+
+function textoDura(d) {
+  if (d.duraMeses == null) return '—';
+  if (d.duraMeses < 0.1) return 'acabou';
+  return '~' + fmtNum(Math.round(d.duraMeses * 10) / 10) + (d.duraMeses === 1 ? ' mês' : ' meses');
 }
 
 function abaConsumo() {
   var dados = dadosConsumo();
+  var usadas = dados.filter(function (d) { return d.usado > 0; });
   var total = dados.reduce(function (s, d) { return s + d.usado; }, 0);
-  var maximo = dados.length ? dados[0].usado : 1;
+  var maximo = dados.length && dados[0].usado > 0 ? dados[0].usado : 1;
   var chamados = dados.reduce(function (s, d) { return s + d.chamados; }, 0);
+  var semEstoque = dados.filter(function (d) { return (parseFloat(d.estoque) || 0) <= 0; }).length;
   var linhas = dados.map(function (d) {
-    var estoqueBaixo = parseFloat(d.estoque) <= 0 ? ' <span class="badge badge-warning">Sem estoque</span>' : '';
+    var zerado = (parseFloat(d.estoque) || 0) <= 0;
+    var alerta = zerado ? ' <span class="badge badge-warning">Sem estoque</span>' : '';
     return '<tr><td>' + esc(d.codigo) + '</td><td>' + esc(d.desc) + '</td>' +
-      '<td class="num"><span class="barra" style="width:' + Math.max(2, Math.round(d.usado / maximo * 90)) + 'px"></span>' + fmtNum(d.usado) + '</td>' +
-      '<td class="num">' + d.chamados + '</td><td class="num">' + fmtNum(d.estoque) + estoqueBaixo + '</td></tr>';
+      '<td class="num">' + (d.usado > 0 ? '<span class="barra" style="width:' + Math.max(2, Math.round(d.usado / maximo * 90)) + 'px"></span>' : '') + fmtNum(d.usado) + '</td>' +
+      '<td class="num">' + d.chamados + '</td><td class="num">' + fmtNum(d.estoque) + alerta + '</td>' +
+      '<td class="num">' + textoDura(d) + '</td></tr>';
   });
   return kpis([
-    { rotulo: 'Peças diferentes usadas', valor: dados.length, cor: '#d93035' },
+    { rotulo: 'Peças usadas no período', valor: usadas.length, cor: '#d93035' },
     { rotulo: 'Unidades consumidas', valor: fmtNum(total) },
-    { rotulo: 'Usos em chamados', valor: chamados }
-  ]) + cabecalho('Consumo de peças — ' + periodo().texto, 'exp-consumo') +
-    tabela([{ t: 'Código' }, { t: 'Peça' }, { t: 'Consumido', num: true }, { t: 'Chamados', num: true }, { t: 'Estoque atual', num: true }], linhas,
-      'Nenhuma peça foi usada em chamados neste período.') +
-    '<p class="rel-nota" style="margin-top:10px;">Chamados "não aprovados" não entram (a peça não foi usada).</p>';
+    { rotulo: 'Usos em chamados', valor: chamados },
+    { rotulo: 'Peças sem estoque', valor: semEstoque }
+  ]) + cabecalho('Consumo e estoque de peças — ' + periodo().texto, 'exp-consumo') +
+    tabela([{ t: 'Código' }, { t: 'Peça' }, { t: 'Consumido no período', num: true }, { t: 'Chamados', num: true }, { t: 'Estoque atual', num: true }, { t: 'Estoque dura', num: true }], linhas,
+      'Nenhuma peça cadastrada no estoque.') +
+    '<p class="rel-nota" style="margin-top:10px;">"Estoque dura" estima por quantos meses o saldo atual cobre o consumo médio mensal do período escolhido. Chamados com orçamento recusado não entram (a peça não foi usada).</p>';
 }
 
 /* ---------- 2) Chamados abertos ---------- */
@@ -131,11 +165,12 @@ function abaAbertos() {
   });
   return kpis([
     { rotulo: 'Abertos no período', valor: chamadosPeriodo.length, cor: '#1b1b18' },
-    { rotulo: 'Abertas', valor: cont.aberta, cor: '#f0a020' },
-    { rotulo: 'Em andamento', valor: cont.em_andamento, cor: '#0073e6' },
-    { rotulo: 'Pendentes', valor: cont.pendente, cor: '#d93035' },
-    { rotulo: 'Concluídos', valor: cont.concluida, cor: '#2e9e5b' },
-    { rotulo: 'Não aprovados', valor: cont.nao_aprovada, cor: '#8a8a85' }
+    { rotulo: 'Abertos', valor: cont.aberta, cor: '#f0a020' },
+    { rotulo: 'Em atendimento', valor: cont.em_andamento, cor: '#0073e6' },
+    { rotulo: 'Aguardando orçamento', valor: cont.pendente, cor: '#d93035' },
+    { rotulo: 'Orçamento aprovado', valor: cont.orcamento_aprovado, cor: '#6b4fd8' },
+    { rotulo: 'Fechados', valor: cont.concluida, cor: '#2e9e5b' },
+    { rotulo: 'Orçamento recusado', valor: cont.nao_aprovada, cor: '#8a8a85' }
   ]) + cabecalho('Chamados do período ainda em aberto — ' + periodo().texto, 'exp-abertos') +
     tabela([{ t: 'Nº' }, { t: 'Abertura' }, { t: 'Cliente' }, { t: 'Equipamento' }, { t: 'Defeito' }, { t: 'Status' }, { t: 'Dias', num: true }], linhas,
       'Nenhum chamado deste período está em aberto.');
@@ -245,8 +280,10 @@ function ligarExportacoes() {
     if (!d.length) { showToast('Não há dados para exportar.', 'warning'); return; }
     exportarExcel('consumo-pecas-' + sufixo + '.xlsx', d, [
       { titulo: 'Código', chave: 'codigo' }, { titulo: 'Peça', chave: 'desc' },
-      { titulo: 'Consumido', valor: function (x) { return x.usado; } }, { titulo: 'Chamados', chave: 'chamados' },
-      { titulo: 'Estoque atual', valor: function (x) { return parseFloat(x.estoque); } }
+      { titulo: 'Consumido no período', valor: function (x) { return x.usado; } }, { titulo: 'Chamados', chave: 'chamados' },
+      { titulo: 'Estoque atual', valor: function (x) { return parseFloat(x.estoque); } },
+      { titulo: 'Consumo médio por mês', valor: function (x) { return Math.round(x.porMes * 100) / 100; } },
+      { titulo: 'Estoque dura (meses)', valor: function (x) { return x.duraMeses == null ? '' : Math.round(x.duraMeses * 10) / 10; } }
     ], 'Consumo');
   });
   if ((b = $('exp-abertos'))) b.addEventListener('click', function () {
