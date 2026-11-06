@@ -55,6 +55,7 @@ window.ADMIN_AUTH_READY = (async function () {
     oficina_interna: ['chamados'],
     programadora: ['chamados', 'clientes'],
     recepcao: ['chamados', 'clientes'],
+    financeiro: ['chamados'],
     atendente: ['dashboard', 'clientes', 'vendas', 'pos-venda'],
     vendedor: ['vendas', 'manutencao', 'pos-venda']
   };

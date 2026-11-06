@@ -2,7 +2,7 @@ var allUsuarios = [];
 
 var ROLE_LABELS = {
   admin: 'Administrador', atendente: 'Atendente (CRM)', vendedor: 'Vendedor',
-  tecnico: 'Técnico (campo)', oficina_interna: 'Oficina interna', programadora: 'Programação de chamados', recepcao: 'Recepção da oficina'
+  tecnico: 'Técnico (campo)', oficina_interna: 'Oficina interna', programadora: 'Programação de chamados', recepcao: 'Recepção da oficina', financeiro: 'Financeiro'
 };
 
 async function chamarGerenciarUsuario(payload) {

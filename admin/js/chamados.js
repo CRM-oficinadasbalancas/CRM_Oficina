@@ -31,7 +31,13 @@ var FILTROS = [
 // (em aberto), aguardando orçamento, orçamento aprovado e fechados. Os demais perfis veem todas.
 var FILTROS_POR_PAPEL = {
   tecnico: [
-    { id: 'abertos', rotulo: 'Em aberto', fn: function (c) { return c.tipo === 'campo' && ['aberta', 'em_andamento'].indexOf(c.status) !== -1; } },
+    { id: 'abertos', rotulo: 'Em aberto', fn: function (c) { return c.tipo === 'campo' && ['aberta', 'em_andamento', 'orcamento_aprovado', 'nao_aprovada'].indexOf(c.status) !== -1; } },
+    { id: 'orcamento', rotulo: 'Aguardando orçamento', fn: function (c) { return c.tipo === 'campo' && c.status === 'pendente'; } },
+    { id: 'fechados', rotulo: 'Fechados', fn: function (c) { return c.status === 'concluida'; } }
+  ],
+  financeiro: [
+    { id: 'faturar', rotulo: 'A faturar', fn: chAFaturar },
+    { id: 'faturados', rotulo: 'Faturados', fn: function (c) { return !!c.faturado_em; } },
     { id: 'fechados', rotulo: 'Fechados', fn: function (c) { return c.status === 'concluida'; } }
   ],
   oficina_interna: [
@@ -43,7 +49,7 @@ var FILTROS_POR_PAPEL = {
   ]
 };
 // Recepção: só as abas do trabalho dela, nesta ordem.
-FILTROS_POR_PAPEL.recepcao = ['abertos', 'orcamento', 'faturar', 'oficina', 'fechados', 'recusados'].map(function (id) {
+FILTROS_POR_PAPEL.recepcao = ['abertos', 'orcamento', 'oficina', 'fechados', 'recusados'].map(function (id) {
   return FILTROS.find(function (f) { return f.id === id; });
 });
 function filtrosAtivos() { return FILTROS_POR_PAPEL[papel] || FILTROS; }
@@ -61,7 +67,8 @@ async function carregar() {
 // Abas que pedem ação de cada perfil: ficam vermelhas com o contador enquanto houver pendência.
 var ALERTAS_POR_PAPEL = {
   admin: ['faturar', 'orcamento'],
-  recepcao: ['faturar', 'orcamento'],
+  recepcao: ['orcamento'],
+  financeiro: ['faturar'],
   programadora: ['orcamento'],
   oficina_interna: ['aprovados', 'recusados']
 };
@@ -86,13 +93,13 @@ function desenharLista() {
   var itens = chPorAbertura(chamados.filter(f.fn)).filter(function (c) {
     if (!termo) return true;
     var cl = c.clientes ? c.clientes.razao_social : '';
-    return [c.numero, cl, equipTxt(c), c.descricao_defeito].join(' ').toLowerCase().indexOf(termo) !== -1;
+    return [chNumero(c), cl, equipTxt(c), c.descricao_defeito].join(' ').toLowerCase().indexOf(termo) !== -1;
   });
   if (filtro === 'fechados' || filtro === 'recusados' || filtro === 'todos') itens.reverse();
   if (!itens.length) { $('ch-tbody').innerHTML = '<tr><td colspan="7">Nenhum chamado neste filtro.</td></tr>'; return; }
   $('ch-tbody').innerHTML = itens.map(function (c) {
     var agenda = c.tipo === 'campo' ? esc(nomeTecnico(c.tecnico_id)) + (c.data_agendada ? '<br><small>' + fmtDia(c.data_agendada) + '</small>' : '') : '<span class="tipo-tag">Oficina interna</span>' + (c.tecnico_id ? '<br><small>' + esc(nomeTecnico(c.tecnico_id)) + '</small>' : '');
-    return '<tr class="ch-linha" data-id="' + c.id + '"><td><b>' + c.numero + '</b></td><td>' + fmtData(c.created_at) + '</td><td>' + esc(c.clientes ? c.clientes.razao_social : '—') +
+    return '<tr class="ch-linha" data-id="' + c.id + '"><td><b>' + chNumero(c) + '</b></td><td>' + fmtData(c.created_at) + '</td><td>' + esc(c.clientes ? c.clientes.razao_social : '—') +
       '</td><td>' + esc(equipTxt(c)) + '</td><td>' + esc((c.descricao_defeito || '').slice(0, 90)) + '</td><td>' + agenda +
       '</td><td><span class="ch-st st-' + c.status + '">' + CH_STATUS_CURTO[c.status] + '</span>' +
       (chAFaturar(c) ? '<br><small style="color:#b4251f; font-weight:700;">A faturar</small>' : (c.faturado_em ? '<br><small>Faturado ' + fmtData(c.faturado_em) + '</small>' : (c.devolvido ? '<br><small>Devolvido ao cliente</small>' : ''))) + '</td></tr>';
@@ -237,7 +244,7 @@ $('n-salvar').addEventListener('click', async function () {
   if (r.error) return erroNovo('Erro ao abrir o chamado: ' + r.error.message);
   await chHistorico(r.data.id, meuId, 'nota', campos.status, tipoNovo === 'campo' ? 'Chamado de campo aberto e programado.' : 'Equipamento recebido na oficina interna.');
   $('modal-novo').classList.remove('open');
-  showToast('Chamado Nº ' + r.data.numero + ' aberto.', 'ok');
+  showToast('Chamado ' + chNumero(r.data) + ' aberto.', 'ok');
   carregar();
 });
 
@@ -253,7 +260,7 @@ async function abrirDetalhe(id) {
 
 function desenharDetalhe() {
   var c = atual, cl = c.clientes || {};
-  $('d-titulo').textContent = 'Chamado Nº ' + c.numero + ' — ' + (c.tipo === 'campo' ? 'Campo' : 'Oficina interna');
+  $('d-titulo').textContent = 'Chamado ' + chNumero(c) + ' — ' + (c.prefixo === 'EX' ? 'Rua (externo)' : 'Oficina') + (c.tipo === 'oficina' && c.prefixo === 'EX' ? ' · transferido para a oficina' : '');
   var end = [cl.logradouro, cl.numero, cl.bairro, cl.municipio, cl.uf].filter(Boolean).join(', ');
   var mapa = chUrlLocal(c);
   $('d-info').innerHTML =
@@ -263,7 +270,7 @@ function desenharDetalhe() {
     '<div><b>Equipamento</b>' + esc(equipTxt(c)) + '</div>' +
     '<div><b>Abertura</b>' + fmtData(c.created_at) + '</div>' +
     (c.status === 'concluida' && c.devolvido ? '<div><b>Encerramento</b>Devolvido ao cliente sem conserto</div>' : '') +
-    (c.status === 'concluida' && c.tipo === 'oficina' && !c.devolvido ? '<div><b>Faturamento</b>' + (c.faturado_em ? 'Faturado em ' + fmtData(c.faturado_em) : '<span style="color:#b4251f; font-weight:700;">A faturar (recepção)</span>') + '</div>' : '') +
+    (c.status === 'concluida' && !c.devolvido && (c.tipo === 'oficina' || c.orcamento_em) ? '<div><b>Faturamento</b>' + (c.faturado_em ? 'Faturado em ' + fmtData(c.faturado_em) : '<span style="color:#b4251f; font-weight:700;">A faturar (financeiro)</span>') + '</div>' : '') +
     '<div><b>Técnico / visita</b>' + (c.tecnico_id ? esc(nomeTecnico(c.tecnico_id)) + (c.tipo === 'campo' ? ' · ' + fmtDia(c.data_agendada) : '') : '—') + '</div>' +
     '<div style="grid-column:1/-1;"><b>Defeito</b>' + esc(c.descricao_defeito) + '</div>' +
     '<div><b>Selo antigo</b>' + (c.selo_antigo_ausente ? 'Não possui' : esc(c.selo_antigo || '—')) + '</div>' +
@@ -277,6 +284,15 @@ function desenharDetalhe() {
   }).join('') || '<span style="color:#8b95a7; font-size:0.88rem;">Nenhuma ação disponível para o seu perfil neste status.</span>';
   $('d-acoes').querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { painelAcao(b.dataset.a); }); });
   $('d-painel').innerHTML = '';
+  carregarItensDetalhe();
+}
+
+// Peças do orçamento / do serviço, com preços e total.
+async function carregarItensDetalhe() {
+  var id = atual.id;
+  var itens = await chCarregarItens(id);
+  if (!atual || atual.id !== id) return;
+  $('d-itens').innerHTML = itens.length ? '<h4 style="margin:0 0 4px; font-size:0.95rem;">Orçamento / peças do serviço</h4>' + chItensTabelaHtml(itens, false) : '';
 }
 
 async function carregarHistorico() {
@@ -313,8 +329,41 @@ function lerVedacao() {
 
 async function garantirPecas() {
   if (pecas.length) return;
-  var r = await supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade').order('codigo');
+  var r = await supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade, marca, preco_venda').order('codigo');
   pecas = r.data || [];
+}
+
+// Editor das peças do chamado (orçamento e fechamento): cada peça entra com o preço de venda do estoque e o total é somado.
+async function itensEditor(c, alvo) {
+  await garantirPecas();
+  async function desenhar() {
+    var itens = await chCarregarItens(c.id);
+    alvo.innerHTML = '<div class="form-field"><label for="i-peca">Peças</label><div class="ch-itens-add"><select id="i-peca"><option value="">— Escolha a peça —</option>' +
+      pecas.map(function (x) {
+        return '<option value="' + x.id + '">' + esc(x.codigo) + ' — ' + esc((x.tipo_modelo || '').slice(0, 40)) + (x.marca ? ' [' + esc(x.marca) + ']' : '') + ' · ' + chMoeda(x.preco_venda) + ' · estoque ' + x.quantidade + '</option>';
+      }).join('') + '</select><input type="text" id="i-qtd" placeholder="Qtd" maxlength="8" inputmode="decimal"><button type="button" class="btn btn-outline" id="i-add">Adicionar</button></div></div>' +
+      '<div>' + chItensTabelaHtml(itens, true) + '</div><p class="erro-msg" id="i-erro" hidden></p>';
+    $('i-add').onclick = async function () {
+      var r = await chAddItem(c.id, $('i-peca').value, $('i-qtd').value, meuId);
+      if (r.erro) { $('i-erro').textContent = r.erro; $('i-erro').hidden = false; return; }
+      desenhar();
+    };
+    alvo.querySelectorAll('[data-rm]').forEach(function (b) {
+      b.onclick = async function () { var r = await chRemoverItem(b.dataset.rm); if (r.erro) { $('i-erro').textContent = r.erro; $('i-erro').hidden = false; return; } desenhar(); };
+    });
+  }
+  await desenhar();
+}
+
+// Enviar para orçamento: peças com preço (somadas no total) + anotação do que precisa ser orçado.
+async function painelOrcamento(c, textoInicial) {
+  var p = $('d-painel');
+  p.innerHTML = '<div class="ch-painel"><p><b>Orçamento</b> — informe as peças (o preço de venda vem do estoque) e descreva o que precisa ser orçado. A recepção fala com o cliente e o chamado volta para a sua fila com a resposta.</p>' +
+    '<div id="a-itens"></div><div class="form-field"><label for="a-nota">Anotação * — diagnóstico e o que precisa de orçamento (peças, mão de obra)</label><textarea id="a-nota" rows="3" maxlength="5000"></textarea></div>' +
+    '<p class="erro-msg" id="a-erro" hidden></p><div class="form-actions"><button type="button" class="btn btn-primary" id="a-ok">Enviar para orçamento (recepção)</button></div></div>';
+  $('a-nota').value = textoInicial || '';
+  itensEditor(c, $('a-itens'));
+  $('a-ok').onclick = function () { executar(function () { return chEnviarOrcamento(c, meuId, $('a-nota').value); }); };
 }
 
 async function painelAcao(acao) {
@@ -325,18 +374,16 @@ async function painelAcao(acao) {
     p.innerHTML = '<div class="ch-painel"><p>Iniciar o atendimento deste chamado?</p>' + erroEl + btnOk + '</div>';
     $('a-ok').onclick = function () { executar(function () { return chIniciar(c, meuId); }); };
   } else if (acao === 'pendencia') {
-    p.innerHTML = '<div class="ch-painel"><div class="form-field"><label for="a-hist">Histórico * — ' + (c.tipo === 'oficina' ? 'o que foi feito e por que o chamado volta para Pendente (ex.: aguardando orçamento ou peça)' : 'o que foi feito e por que vai para a oficina interna') + '</label><textarea id="a-hist" rows="3"></textarea></div>' +
+    p.innerHTML = '<div class="ch-painel"><div class="form-field"><label for="a-hist">Histórico * — o que foi feito e por que o chamado vai para a oficina interna</label><textarea id="a-hist" rows="3"></textarea></div>' +
       '<details><summary style="cursor:pointer; font-weight:600;">Selos e lacres (opcional)</summary>' + camposVedacaoHtml(false) + '</details>' + erroEl + btnOk + '</div>';
     ligarFlags();
     $('a-ok').onclick = function () { var v = lerVedacao(); v.historico = $('a-hist').value; executar(function () { return chPendencia(c, meuId, v); }); };
   } else if (acao === 'fechar') {
-    await garantirPecas();
     p.innerHTML = '<div class="ch-painel"><div class="form-field"><label for="a-hist">Histórico do chamado * — o que foi feito</label><textarea id="a-hist" rows="3"></textarea></div>' + camposVedacaoHtml(true) +
-      '<div class="form-grid"><div class="form-field"><label for="a-peca">Peça utilizada (se houve)</label><select id="a-peca"><option value="">— Nenhuma (não baixa estoque) —</option>' +
-      pecas.map(function (x) { return '<option value="' + x.id + '">' + esc(x.codigo) + ' — ' + esc((x.tipo_modelo || '').slice(0, 50)) + ' (estoque: ' + x.quantidade + ')</option>'; }).join('') +
-      '</select></div><div class="form-field"><label for="a-qtd">Quantidade usada</label><input type="text" id="a-qtd" maxlength="8" placeholder="Ex: 1"></div></div>' + erroEl + btnOk + '</div>';
+      '<div id="a-itens"></div><p class="hint">As peças listadas aqui são as usadas no serviço: o estoque baixa quando o chamado fecha (sem peças, não baixa).</p>' + erroEl + btnOk + '</div>';
     ligarFlags();
-    $('a-ok').onclick = function () { var v = lerVedacao(); v.historico = $('a-hist').value; v.pecaId = $('a-peca').value; v.qtd = $('a-qtd').value; executar(function () { return chFechar(c, meuId, v); }); };
+    itensEditor(c, $('a-itens'));
+    $('a-ok').onclick = function () { var v = lerVedacao(); v.historico = $('a-hist').value; executar(function () { return chFechar(c, meuId, v); }); };
   } else if (acao === 'faturar') {
     p.innerHTML = '<div class="ch-painel"><p>Confirma que o serviço deste chamado foi <b>faturado</b>?</p>' +
       '<div class="form-field"><label for="a-nota">Observação (opcional) — nº da nota, pedido ou forma de cobrança</label><textarea id="a-nota" rows="2" maxlength="500"></textarea></div>' + erroEl + btnOk + '</div>';
@@ -352,7 +399,7 @@ async function painelAcao(acao) {
       (podeOrc ? '<button type="button" class="btn btn-primary" id="a-orc">Enviar para orçamento (recepção)</button>' : '') + '</div>' +
       (podeOrc ? '<span class="hint">"Enviar para orçamento" salva a anotação e passa o chamado para a recepção falar com o cliente. Depois da resposta ele volta para a fila da oficina.</span>' : '') + '</div>';
     $('a-ok').onclick = function () { executar(function () { return chAnotar(c, meuId, $('a-nota').value); }); };
-    if (podeOrc) $('a-orc').onclick = function () { executar(function () { return chEnviarOrcamento(c, meuId, $('a-nota').value); }); };
+    if (podeOrc) $('a-orc').onclick = function () { painelOrcamento(c, $('a-nota').value); };
   } else if (acao === 'aprovar' || acao === 'recusar') {
     var aprova = acao === 'aprovar';
     p.innerHTML = '<div class="ch-painel"><p>' + (aprova ? 'Orçamento <b>aprovado</b>: o equipamento segue para a oficina interna.' : 'Orçamento <b>recusado</b>: o equipamento não será consertado e deve ser devolvido ao cliente.') + '</p>' +
@@ -415,7 +462,7 @@ setInterval(function () {
   var t = await supabaseClient.rpc('listar_tecnicos');
   tecnicos = t.data || [];
   // cada perfil começa no filtro que mais usa
-  filtro = papel === 'recepcao' ? 'orcamento' : (papel === 'programadora' ? 'campo' : 'abertos');
+  filtro = papel === 'recepcao' ? 'orcamento' : (papel === 'financeiro' ? 'faturar' : (papel === 'programadora' ? 'campo' : 'abertos'));
   await carregar();
   var alvo = new URLSearchParams(location.search).get('abrir');
   if (alvo) abrirDetalhe(alvo);

@@ -88,7 +88,7 @@ var SEL = '*, clientes(razao_social, telefone_empresa, logradouro, numero, bairr
 // Abas por perfil: técnico de rua = campo em aberto e fechados; oficina interna = o que está na oficina,
 // aguardando orçamento, orçamento aprovado e fechados.
 var ABAS = {
-  tecnico: [{ id: 'abertos', t: 'Em aberto' }, { id: 'fechados', t: 'Fechados' }],
+  tecnico: [{ id: 'abertos', t: 'Em aberto' }, { id: 'orcamento', t: 'Aguardando orçamento' }, { id: 'fechados', t: 'Fechados' }],
   oficina_interna: [{ id: 'abertos', t: 'Em aberto' }, { id: 'orcamento', t: 'Aguardando orçamento' }, { id: 'aprovados', t: 'Orçamento aprovado' }, { id: 'recusados', t: 'Orçamento recusado' }, { id: 'fechados', t: 'Fechados' }]
 };
 var ABA_TITULO = { abertos: 'Em aberto', orcamento: 'Aguardando orçamento', aprovados: 'Orçamento aprovado', recusados: 'Orçamento recusado — devolver ao cliente', fechados: 'Fechados (últimos 100)' };
@@ -119,7 +119,9 @@ async function carregarAgenda(silencioso) {
   desenharAbas();
   var q = supabaseClient.from('assistencias_tecnicas').select(SEL);
   if (papel === 'tecnico') {
-    q = aba === 'fechados' ? q.eq('status', 'concluida') : q.eq('tipo', 'campo').in('status', ['aberta', 'em_andamento']);
+    if (aba === 'fechados') q = q.eq('status', 'concluida');
+    else if (aba === 'orcamento') q = q.eq('tipo', 'campo').eq('status', 'pendente');
+    else q = q.eq('tipo', 'campo').in('status', ['aberta', 'em_andamento', 'orcamento_aprovado', 'nao_aprovada']);
   } else if (papel === 'oficina_interna') {
     q = q.eq('tipo', 'oficina');
     if (aba === 'fechados') q = q.eq('status', 'concluida');
@@ -154,7 +156,7 @@ function cartao(c, ordem) {
   var extra = '';
   if (estado.rota && estado.rota.dist && estado.rota.dist[c.id] != null) extra = '<span class="card-dist">+' + estado.rota.dist[c.id].toFixed(1).replace('.', ',') + ' km</span>';
   return '<button type="button" class="card s-' + c.status + '" data-id="' + c.id + '">' +
-    '<div class="card-topo"><span class="card-num">' + (ordem ? '<span class="parada">' + ordem + '</span>' : '') + 'Nº ' + c.numero + '</span><span class="badge b-' + c.status + '">' + CH_STATUS_CURTO[c.status] + '</span></div>' +
+    '<div class="card-topo"><span class="card-num">' + (ordem ? '<span class="parada">' + ordem + '</span>' : '') + chNumero(c) + '</span><span class="badge b-' + c.status + '">' + CH_STATUS_CURTO[c.status] + '</span></div>' +
     '<div class="card-cli">' + esc(cl.razao_social || '—') + '</div>' +
     '<div class="card-eq">' + esc(equipTxt(c)) + '</div>' +
     '<div class="card-end">' + esc(enderecoTxt(cl) || 'Endereço não informado') + ' ' + extra + '</div>' +
@@ -179,7 +181,7 @@ function desenharAgenda() {
   var hoje = hojeISO();
   var aba = estado.aba || 'abertos';
   // abas que não são a agenda de campo: lista simples (fechados do mais recente ao mais antigo)
-  var plano = ABAS[papel] && (aba === 'fechados' || (papel === 'oficina_interna' && aba !== 'abertos'));
+  var plano = ABAS[papel] && aba !== 'abertos';
 
   if (plano) {
     var ordenados = aba === 'fechados' ? estado.chamados : lista;
@@ -259,7 +261,7 @@ async function otimizarRotaAuto() {
   if (papel === 'oficina_interna' || estado.calculandoRota) return;
   if (ABAS[papel] && (estado.aba || 'abertos') !== 'abertos') return;
   var hoje = hojeISO();
-  var doDia = chPorAbertura(estado.chamados.filter(function (c) { return c.tipo === 'campo' && (!c.data_agendada || c.data_agendada === hoje); }));
+  var doDia = chPorAbertura(estado.chamados.filter(function (c) { return c.tipo === 'campo' && ['aberta', 'em_andamento', 'orcamento_aprovado'].indexOf(c.status) !== -1 && (!c.data_agendada || c.data_agendada === hoje); }));
   if (doDia.length < 2) { estado.rota = null; estado.rotaAssin = ''; $('rota-info').textContent = ''; $('rota-mapa').hidden = true; $('bloco-rota').hidden = true; return; }
   var assin = doDia.map(function (c) { return c.id; }).join(',');
   if (estado.rota && estado.rotaAssin === assin) return;
@@ -301,7 +303,7 @@ async function abrirChamado(id) {
 
 function desenharChamado() {
   var c = estado.atual, cl = c.clientes || {};
-  $('ch-titulo').textContent = 'Chamado Nº ' + c.numero;
+  $('ch-titulo').textContent = 'Chamado ' + chNumero(c);
   var mapa = chUrlLocal(c);
   $('ch-cliente').innerHTML =
     '<div class="cli-nome">' + esc(cl.razao_social || '—') + '</div>' +
@@ -323,6 +325,41 @@ function desenharChamado() {
   }).join('') || '<p class="dica">Nenhuma ação disponível neste status.</p>';
   $('ch-acoes').querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { formAcao(b.dataset.a); }); });
   $('ch-form').innerHTML = '';
+  carregarItensChamado();
+}
+
+// Peças do orçamento / do serviço, com preços e total.
+async function carregarItensChamado() {
+  var id = estado.atual.id;
+  var itens = await chCarregarItens(id);
+  if (!estado.atual || estado.atual.id !== id) return;
+  $('ch-itens').hidden = !itens.length;
+  $('ch-itens').innerHTML = itens.length ? '<b>Orçamento / peças do serviço</b>' + chItensTabelaHtml(itens, false) : '';
+}
+
+// Editor das peças do chamado (orçamento e fechamento): o preço de venda vem do estoque e o total é somado.
+async function itensEditor(c, alvo) {
+  if (!estado.pecas.length) {
+    var rp = await supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade, marca, preco_venda').order('codigo');
+    estado.pecas = rp.data || [];
+  }
+  async function desenhar() {
+    var itens = await chCarregarItens(c.id);
+    alvo.innerHTML = '<label for="i-peca">Peças</label><div class="ch-itens-add"><select id="i-peca"><option value="">— Escolha a peça —</option>' +
+      estado.pecas.map(function (p) {
+        return '<option value="' + p.id + '">' + esc(p.codigo) + ' — ' + esc((p.tipo_modelo || '').slice(0, 34)) + (p.marca ? ' [' + esc(p.marca) + ']' : '') + ' · ' + chMoeda(p.preco_venda) + '</option>';
+      }).join('') + '</select><input id="i-qtd" type="text" inputmode="decimal" maxlength="8" placeholder="Qtd"><button type="button" class="btn btn-escuro" id="i-add">Adicionar peça</button></div>' +
+      chItensTabelaHtml(itens, true) + '<p class="erro" id="i-erro" hidden></p>';
+    $('i-add').onclick = async function () {
+      var r = await chAddItem(c.id, $('i-peca').value, $('i-qtd').value, estado.sessao.user.id);
+      if (r.erro) { $('i-erro').textContent = r.erro; $('i-erro').hidden = false; return; }
+      desenhar();
+    };
+    alvo.querySelectorAll('[data-rm]').forEach(function (b) {
+      b.onclick = async function () { var r = await chRemoverItem(b.dataset.rm); if (r.erro) { $('i-erro').textContent = r.erro; $('i-erro').hidden = false; return; } desenhar(); };
+    });
+  }
+  await desenhar();
 }
 
 async function carregarHistoricoChamado() {
@@ -358,6 +395,18 @@ function lerVedacao() {
   };
 }
 
+// Enviar para orçamento: peças com preço (somadas no total) + anotação do que precisa ser orçado.
+function formOrcamento(c, textoInicial) {
+  var box = $('ch-form');
+  box.innerHTML = '<div class="caixa"><p><b>Orçamento</b> — informe as peças (o preço de venda vem do estoque) e descreva o que precisa ser orçado. A recepção fala com o cliente e o chamado volta para a sua fila com a resposta.</p>' +
+    '<div id="f-itens"></div><label for="f-hist">Anotação * — diagnóstico e o que precisa de orçamento</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' +
+    '<p class="erro" id="f-erro" hidden></p><button type="button" class="btn btn-vermelho btn-bloco" id="f-ok">Enviar para orçamento (recepção)</button></div>';
+  $('f-hist').value = textoInicial || '';
+  itensEditor(c, $('f-itens'));
+  $('f-ok').onclick = function () { executar(function () { return chEnviarOrcamento(c, estado.sessao.user.id, $('f-hist').value); }, 'Enviado para orçamento (recepção).', false); };
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function formAcao(acao) {
   var c = estado.atual, box = $('ch-form');
   var rodape = '<p class="erro" id="f-erro" hidden></p><button type="button" class="btn btn-vermelho btn-bloco" id="f-ok">Confirmar</button>';
@@ -375,24 +424,18 @@ async function formAcao(acao) {
       '<p class="erro" id="f-erro" hidden></p><button type="button" class="btn btn-escuro btn-bloco" id="f-ok">Salvar anotação</button>' +
       (podeOrc ? '<button type="button" class="btn btn-vermelho btn-bloco" id="f-orc" style="margin-top:8px;">Enviar para orçamento (recepção)</button><p class="dica">Passa o chamado para a recepção falar com o cliente. Depois da resposta ele volta para a sua fila.</p>' : '') + '</div>';
     $('f-ok').onclick = function () { executar(function () { return chAnotar(c, estado.sessao.user.id, $('f-hist').value); }, 'Anotação registrada.', true); };
-    if (podeOrc) $('f-orc').onclick = function () { executar(function () { return chEnviarOrcamento(c, estado.sessao.user.id, $('f-hist').value); }, 'Enviado para orçamento (recepção).', false); };
+    if (podeOrc) $('f-orc').onclick = function () { formOrcamento(c, $('f-hist').value); };
   } else if (acao === 'pendencia') {
-    box.innerHTML = '<div class="caixa"><label for="f-hist">Histórico * — ' + (c.tipo === 'oficina' ? 'o que foi feito e por que volta para Pendente (ex.: aguardando orçamento ou peça)' : 'o que foi feito e por que vai para a oficina interna') + '</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' +
+    box.innerHTML = '<div class="caixa"><label for="f-hist">Histórico * — o que foi feito e por que o chamado vai para a oficina interna</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' +
       '<details><summary>Selos e lacres (pode deixar em branco)</summary>' + vedacaoHtml(false) + '</details>' + rodape + '</div>';
     ligarFlags();
-    $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; executar(function () { return chPendencia(c, estado.sessao.user.id, v); }, (c.tipo === 'oficina' ? 'Chamado atualizado.' : 'Enviado para a oficina interna.'), false); };
+    $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; executar(function () { return chPendencia(c, estado.sessao.user.id, v); }, 'Enviado para a oficina interna.', false); };
   } else if (acao === 'fechar') {
-    if (!estado.pecas.length) {
-      var rp = await supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade').order('codigo');
-      estado.pecas = rp.data || [];
-    }
     box.innerHTML = '<div class="caixa"><label for="f-hist">Histórico do chamado * — o que foi feito</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' + vedacaoHtml(true) +
-      '<label for="f-peca">Peça utilizada (se houve)</label><select id="f-peca"><option value="">Nenhuma — não baixa estoque</option>' +
-      estado.pecas.map(function (p) { return '<option value="' + p.id + '">' + esc(p.codigo) + ' — ' + esc((p.tipo_modelo || '').slice(0, 40)) + ' (estoque: ' + fmtQtd(p.quantidade) + ')</option>'; }).join('') + '</select>' +
-      '<label for="f-qtd">Quantidade usada</label><input id="f-qtd" type="text" inputmode="decimal" maxlength="8" placeholder="Ex: 1">' +
-      '<p class="dica">O estoque só desce se você escolher uma peça.</p>' + rodape + '</div>';
+      '<div id="f-itens"></div><p class="dica">As peças listadas são as usadas no serviço: o estoque baixa quando o chamado fecha (sem peças, não baixa).</p>' + rodape + '</div>';
     ligarFlags();
-    $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; v.pecaId = $('f-peca').value; v.qtd = $('f-qtd').value; executar(function () { return chFechar(c, estado.sessao.user.id, v); }, 'Chamado fechado.', false); };
+    itensEditor(c, $('f-itens'));
+    $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; executar(function () { return chFechar(c, estado.sessao.user.id, v); }, 'Chamado fechado.', false); };
   }
   box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }

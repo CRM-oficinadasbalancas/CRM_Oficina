@@ -100,7 +100,7 @@ async function loadHistoricoAssistencias(clienteId, containerId) {
     var equipamento = [eq.marca, eq.modelo].filter(Boolean).join(' ') || '—';
 
     return '<div style="border-bottom:1px solid var(--off-white); padding:14px 0;">' +
-      '<strong>Assistência nº ' + a.numero + '</strong> <span class="badge ' + badgeClass + '">' + badgeText + '</span> — ' + dataStr +
+      '<strong>Chamado ' + (a.codigo || ('nº ' + a.numero)) + '</strong> <span class="badge ' + badgeClass + '">' + badgeText + '</span> — ' + dataStr +
       '<p style="margin:8px 0; font-size:0.88rem;">' +
         '<strong>Equipamento:</strong> ' + equipamento + ' &nbsp; <strong>Nº de Série:</strong> ' + (eq.numero_serie || '—') +
       '</p>' +

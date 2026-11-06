@@ -31,15 +31,72 @@ function chNormalizarSerie(texto) {
 
 var CH_QTD = /^\d{1,5}(\.\d{1,2})?$/;
 
+// Número do chamado: OF-0001 (oficina interna) ou EX-0001 (rua).
+function chNumero(c) { return c.codigo || ('Nº ' + c.numero); }
+
+function chMoeda(v) {
+  if (v == null || v === '' || isNaN(Number(v))) return '—';
+  return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+// Peças do chamado (orçamento e serviço): várias por chamado, com o preço de venda do momento.
+async function chCarregarItens(chamadoId) {
+  var r = await supabaseClient.from('chamado_itens').select('id, quantidade, preco_unit, peca_id, estoque_pecas(codigo, tipo_modelo, marca)')
+    .eq('chamado_id', chamadoId).order('created_at', { ascending: true });
+  return r.data || [];
+}
+
+function chTotalItens(itens) {
+  var total = 0, semPreco = 0;
+  (itens || []).forEach(function (i) {
+    if (i.preco_unit == null) semPreco++; else total += Number(i.quantidade) * Number(i.preco_unit);
+  });
+  return { total: total, semPreco: semPreco };
+}
+
+async function chAddItem(chamadoId, pecaId, qtdTxt, autorId) {
+  var q = String(qtdTxt || '').trim().replace(',', '.');
+  if (!pecaId) return { erro: 'Escolha a peça.' };
+  if (!q) return { erro: 'Informe a quantidade.' };
+  if (!CH_QTD.test(q) || parseFloat(q) <= 0) return { erro: 'Quantidade inválida (use um número maior que zero, até 2 casas decimais).' };
+  var r = await supabaseClient.from('chamado_itens').insert({ chamado_id: chamadoId, peca_id: pecaId, quantidade: parseFloat(q), created_by: autorId });
+  return r.error ? { erro: r.error.message } : {};
+}
+
+async function chRemoverItem(itemId) {
+  var r = await supabaseClient.from('chamado_itens').delete().eq('id', itemId);
+  return r.error ? { erro: r.error.message } : {};
+}
+
+// Tabela das peças com preços e total (editavel = mostra o botão de remover).
+function chItensTabelaHtml(itens, editavel) {
+  function e(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  if (!itens || !itens.length) return '<p class="ch-itens-vazio">Nenhuma peça informada.</p>';
+  var t = chTotalItens(itens);
+  var linhas = itens.map(function (i) {
+    var p = i.estoque_pecas || {};
+    var sub = i.preco_unit == null ? null : Number(i.quantidade) * Number(i.preco_unit);
+    return '<tr><td>' + e(p.codigo) + ' — ' + e((p.tipo_modelo || '').slice(0, 40)) + (p.marca ? '<br><small>' + e(p.marca) + '</small>' : '') + '</td>' +
+      '<td class="n">' + Number(i.quantidade).toLocaleString('pt-BR') + '</td><td class="n">' + chMoeda(i.preco_unit) + '</td><td class="n">' + chMoeda(sub) + '</td>' +
+      (editavel ? '<td><button type="button" class="ch-item-rm" data-rm="' + i.id + '" aria-label="Remover peça" title="Remover">&times;</button></td>' : '') + '</tr>';
+  }).join('');
+  return '<table class="ch-itens"><thead><tr><th>Peça</th><th class="n">Qtd</th><th class="n">Preço</th><th class="n">Subtotal</th>' + (editavel ? '<th></th>' : '') + '</tr></thead><tbody>' + linhas +
+    '</tbody><tfoot><tr><td colspan="3"><b>Total</b></td><td class="n"><b>' + chMoeda(t.total) + '</b></td>' + (editavel ? '<td></td>' : '') + '</tr></tfoot></table>' +
+    (t.semPreco ? '<p class="ch-itens-aviso">' + t.semPreco + ' peça(s) sem preço de venda cadastrado no estoque (fora do total).</p>' : '');
+}
+
 // Ações possíveis por perfil e situação do chamado.
 function chAcoes(papel, c) {
   var a = [];
   var s = c.status;
   var admin = papel === 'admin';
-  // Técnico de rua: só chamados de campo (transferir para a oficina ou fechar).
+  // Técnico de rua (chamado EX): inicia, envia para orçamento (pela anotação), executa e fecha, devolve se recusado
+  // ou transfere para a oficina interna.
   if ((admin || papel === 'tecnico') && c.tipo === 'campo') {
     if (s === 'aberta') a.push('iniciar', 'pendencia');
     if (s === 'em_andamento') a.push('pendencia', 'fechar');
+    if (s === 'orcamento_aprovado') a.push('iniciar', 'fechar');
+    if (s === 'nao_aprovada') a.push('devolver');
   }
   // Oficina interna: a fila dela é Aberto, Em atendimento e Orçamento aprovado. Para pedir orçamento usa
   // "Adicionar anotação" + "Enviar para orçamento". Orçamento recusado: fecha e devolve o equipamento.
@@ -52,8 +109,8 @@ function chAcoes(papel, c) {
     if (s === 'pendente') a.push('aprovar', 'recusar');
   }
   if ((admin || papel === 'programadora') && c.tipo === 'campo' && (s === 'aberta' || s === 'em_andamento')) a.push('agendar');
-  // faturamento: serviço fechado que passou por orçamento aprovado volta para a recepção faturar
-  if ((admin || papel === 'recepcao') && chAFaturar(c)) a.push('faturar');
+  // faturamento: só o Financeiro (e o admin)
+  if ((admin || papel === 'financeiro') && chAFaturar(c)) a.push('faturar');
   // anotação no histórico (diagnóstico, observação): qualquer perfil do chamado, enquanto ele não está encerrado
   if (admin || ((papel === 'tecnico' || papel === 'oficina_interna' || papel === 'programadora' || papel === 'recepcao') && s !== 'concluida' && s !== 'nao_aprovada')) a.push('anotar');
   return a.filter(function (x, i) { return a.indexOf(x) === i; });
@@ -72,8 +129,8 @@ async function chAtualizar(c, campos, autorId, tipoHist, texto) {
   return { chamado: r.data };
 }
 
-// Chamado da oficina já fechado que ainda não foi faturado (equipamento devolvido sem conserto não fatura).
-function chAFaturar(c) { return c.status === 'concluida' && c.tipo === 'oficina' && !c.devolvido && !c.faturado_em; }
+// Chamado fechado a faturar: oficina sempre; rua só se passou por orçamento. Devolvido sem conserto não fatura.
+function chAFaturar(c) { return c.status === 'concluida' && !c.devolvido && !c.faturado_em && (c.tipo === 'oficina' || !!c.orcamento_em); }
 
 async function chFaturar(c, autorId, texto) {
   texto = (texto || '').trim();
@@ -85,8 +142,8 @@ async function chFaturar(c, autorId, texto) {
 
 // A oficina pode pedir orçamento a partir de uma anotação: o chamado vai para a recepção (Aguardando orçamento).
 function chPodeEnviarOrcamento(papel, c) {
-  return (papel === 'admin' || papel === 'oficina_interna') && c.tipo === 'oficina' &&
-    (c.status === 'aberta' || c.status === 'em_andamento' || c.status === 'orcamento_aprovado');
+  var meu = (papel === 'admin') || (papel === 'oficina_interna' && c.tipo === 'oficina') || (papel === 'tecnico' && c.tipo === 'campo');
+  return meu && (c.status === 'aberta' || c.status === 'em_andamento' || c.status === 'orcamento_aprovado');
 }
 
 async function chEnviarOrcamento(c, autorId, texto) {
@@ -150,8 +207,9 @@ async function chPendencia(c, autorId, f) {
   var erros = chCamposVedacao(f, false);
   if (erros.length) return { erro: erros[0] };
   var campos = chCamposDoFormulario(f);
-  campos.status = 'pendente';
-  return chAtualizar(c, campos, autorId, 'pendencia', texto);
+  campos.tipo = 'oficina';    // o chamado vira da oficina interna (mantém o número EX) e entra na fila dela
+  campos.status = 'aberta';
+  return chAtualizar(c, campos, autorId, 'pendencia', 'Transferido para a oficina interna: ' + texto);
 }
 
 // Fechamento: histórico + selo/lacre novo e antigo obrigatórios (antigo dispensável pela marcação "Não possui").
@@ -160,16 +218,10 @@ async function chFechar(c, autorId, f) {
   if (!texto) return { erro: 'Preencha o histórico do chamado (o que foi feito).' };
   var erros = chCamposVedacao(f, true);
   if (erros.length) return { erro: erros[0] };
-  var qtdStr = (f.qtd || '').trim().replace(',', '.');
-  var pecaId = f.pecaId || null;
-  if (pecaId && !qtdStr) return { erro: 'Informe a quantidade usada da peça.' };
-  if (!pecaId && qtdStr) return { erro: 'Escolha a peça da quantidade informada.' };
-  if (qtdStr && !CH_QTD.test(qtdStr)) return { erro: 'Quantidade inválida (até 5 dígitos e 2 casas decimais).' };
   var campos = chCamposDoFormulario(f);
   campos.status = 'concluida';
   campos.resolucao = texto;
-  campos.peca_id = pecaId;
-  campos.quantidade_peca_utilizada = pecaId ? parseFloat(qtdStr) : null; // sem peça: o estoque não é baixado
+  // as peças usadas são as da lista do chamado (o estoque baixa ao fechar; sem peças, não baixa)
   return chAtualizar(c, campos, autorId, 'fechamento', texto);
 }
 
@@ -244,4 +296,4 @@ function chPorAbertura(lista) {
   return lista.slice().sort(function (a, b) { return new Date(a.created_at) - new Date(b.created_at); });
 }
 
-if (typeof module !== 'undefined') module.exports = { chPodeEnviarOrcamento: chPodeEnviarOrcamento, chAFaturar: chAFaturar, chOtimizarRota: chOtimizarRota, chKm: chKm, chUrlRota: chUrlRota, chAcoes: chAcoes, chPorAbertura: chPorAbertura, chCamposVedacao: chCamposVedacao };
+if (typeof module !== 'undefined') module.exports = { chNumero: chNumero, chTotalItens: chTotalItens, chPodeEnviarOrcamento: chPodeEnviarOrcamento, chAFaturar: chAFaturar, chOtimizarRota: chOtimizarRota, chKm: chKm, chUrlRota: chUrlRota, chAcoes: chAcoes, chPorAbertura: chPorAbertura, chCamposVedacao: chCamposVedacao };

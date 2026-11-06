@@ -86,6 +86,16 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--vermelho); 
 .b-nao_aprovada { background: #ececea; color: #55554f; }
 .vazio { text-align: center; color: var(--muted); padding: 40px 10px; }
 
+.ch-itens { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 6px 0; }
+.ch-itens th { text-align: left; font-size: 0.68rem; text-transform: uppercase; color: #8b8b85; padding: 5px 4px; border-bottom: 1px solid #e4e4e0; }
+.ch-itens td { padding: 7px 4px; border-bottom: 1px solid #f0f0ec; vertical-align: top; }
+.ch-itens .n { text-align: right; white-space: nowrap; }
+.ch-itens tfoot td { border-bottom: 0; border-top: 2px solid #1b1b18; }
+.ch-itens-vazio { color: #8b8b85; font-size: 0.85rem; }
+.ch-itens-aviso { color: #b5262a; font-size: 0.8rem; }
+.ch-item-rm { border: 0; background: #f1f1ee; border-radius: 50%; width: 30px; height: 30px; font-size: 1.2rem; line-height: 1; }
+.ch-itens-add { display: grid; grid-template-columns: 1fr 76px; gap: 8px; }
+.ch-itens-add button { grid-column: 1 / -1; }
 .abas { display: flex; gap: 6px; overflow-x: auto; padding: 0 14px 10px; -webkit-overflow-scrolling: touch; }
 .abas[hidden] { display: none; }
 .aba { flex: 0 0 auto; border: 1px solid #cfcfca; background: #fff; color: #1b1b18; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 700; font-size: 0.85rem; }

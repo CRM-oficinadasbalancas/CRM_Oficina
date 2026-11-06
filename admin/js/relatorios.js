@@ -11,7 +11,9 @@ var abaAtual = 'consumo';
 var chamadosPeriodo = [];   // abertos no período (todos os status)
 var chamadosEmAberto = [];  // backlog: abertos hoje, qualquer data
 var chamadosOficinaAno = [];  // chamados da oficina com algum evento (abertura, orçamento, faturamento) no ano
-var pecasEstoque = [];      // todas as peças e o saldo de hoje
+var pecasEstoque = [];
+var custosPeca = {};         // custo unitário atual de cada peça (só admin/financeiro enxergam)
+var nomesTecnicos = {};      // id -> nome      // todas as peças e o saldo de hoje
 var carregou = false;
 
 function esc(v) {
@@ -30,6 +32,10 @@ function equipamentoTexto(c) {
   return nome + (eq.numero_serie ? ' (série ' + eq.numero_serie + ')' : '');
 }
 function nomeCliente(c) { return c.clientes ? c.clientes.razao_social : '—'; }
+function numChamado(c) { return c.codigo || c.numero; }
+// Peças realmente usadas: só chamados fechados com serviço feito (devolvido sem conserto não usa peça).
+function pecasUsadas(c) { return c.status === 'concluida' && !c.devolvido ? (c.itens || []) : []; }
+function fmtReais(v) { return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
 function sufixoArquivo() {
   var mes = $('f-mes').value;
   return $('f-ano').value + (mes ? '-' + String(mes).padStart(2, '0') : '');
@@ -44,7 +50,7 @@ function periodo() {
   return { ini: ini, fim: fim, texto: mes ? MESES[mes - 1] + ' de ' + ano : 'ano de ' + ano };
 }
 
-var SELECT_CHAMADO = '*, clientes(razao_social), equipamentos(marca, modelo, numero_serie), estoque_pecas(codigo, tipo_modelo, quantidade)';
+var SELECT_CHAMADO = '*, clientes(razao_social), equipamentos(marca, modelo, numero_serie)';
 
 async function carregar() {
   var p = periodo();
@@ -57,21 +63,36 @@ async function carregar() {
       .order('created_at', { ascending: false }).limit(5000),
     supabaseClient.from('assistencias_tecnicas').select(SELECT_CHAMADO)
       .in('status', STATUS_ABERTOS).order('created_at', { ascending: true }).limit(5000),
-    supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade').order('codigo').limit(5000),
+    supabaseClient.from('estoque_pecas').select('id, codigo, tipo_modelo, quantidade, marca').order('codigo').limit(5000),
     (function () {
       var ano = parseInt($('f-ano').value, 10);
       var a = new Date(ano, 0, 1).toISOString(), b = new Date(ano + 1, 0, 1).toISOString();
       return supabaseClient.from('assistencias_tecnicas').select(SELECT_CHAMADO).eq('tipo', 'oficina')
         .or('and(created_at.gte.' + a + ',created_at.lt.' + b + '),and(orcamento_em.gte.' + a + ',orcamento_em.lt.' + b + '),and(faturado_em.gte.' + a + ',faturado_em.lt.' + b + ')')
         .limit(5000);
-    })()
+    })(),
+    (function () {
+      // peças (itens) dos chamados abertos no período
+      return supabaseClient.from('chamado_itens')
+        .select('chamado_id, quantidade, preco_unit, peca_id, estoque_pecas(codigo, tipo_modelo, marca), assistencias_tecnicas!inner(created_at)')
+        .gte('assistencias_tecnicas.created_at', p.ini.toISOString()).lt('assistencias_tecnicas.created_at', p.fim.toISOString()).limit(20000);
+    })(),
+    supabaseClient.from('estoque_custos').select('peca_id, custo'),
+    supabaseClient.rpc('listar_tecnicos')
   ]);
   if (res[0].error || res[1].error || res[3].error) {
     $('painel').innerHTML = '<p class="rel-nota">Não foi possível carregar: ' + esc((res[0].error || res[1].error || res[3].error).message) + '</p>';
     return;
   }
   chamadosOficinaAno = res[3].data || [];
+  custosPeca = {};
+  (res[5].data || []).forEach(function (c) { custosPeca[c.peca_id] = parseFloat(c.custo); });
+  nomesTecnicos = {};
+  (res[6].data || []).forEach(function (t) { nomesTecnicos[t.id] = t.nome; });
   chamadosPeriodo = res[0].data || [];
+  var itensPorChamado = {};
+  (res[4].data || []).forEach(function (i) { (itensPorChamado[i.chamado_id] = itensPorChamado[i.chamado_id] || []).push(i); });
+  chamadosPeriodo.forEach(function (c) { c.itens = itensPorChamado[c.id] || []; });
   chamadosEmAberto = res[1].data || [];
   pecasEstoque = res[2].data || [];
   carregou = true;
@@ -110,24 +131,41 @@ function dadosConsumo() {
   var mapa = {};
   // todas as peças do estoque entram, mesmo as que não foram usadas no período
   pecasEstoque.forEach(function (p) {
-    mapa[p.id] = { codigo: p.codigo || '—', desc: p.tipo_modelo || '', usado: 0, chamados: 0, estoque: p.quantidade };
+    mapa[p.id] = { codigo: p.codigo || '—', desc: p.tipo_modelo || '', marca: p.marca || '', usado: 0, chamados: 0, estoque: p.quantidade, custo: 0, venda: 0, _c: {} };
   });
   chamadosPeriodo.forEach(function (c) {
-    if (!c.peca_id || c.status === 'nao_aprovada') return;
-    var q = parseFloat(c.quantidade_peca_utilizada) || 0;
-    if (!q) return;
-    var p = c.estoque_pecas || {};
-    if (!mapa[c.peca_id]) mapa[c.peca_id] = { codigo: p.codigo || '—', desc: p.tipo_modelo || '', usado: 0, chamados: 0, estoque: p.quantidade };
-    mapa[c.peca_id].usado += q;
-    mapa[c.peca_id].chamados += 1;
+    pecasUsadas(c).forEach(function (i) {
+      var q = parseFloat(i.quantidade) || 0;
+      if (!q) return;
+      var p = i.estoque_pecas || {};
+      var m = mapa[i.peca_id] || (mapa[i.peca_id] = { codigo: p.codigo || '—', desc: p.tipo_modelo || '', marca: p.marca || '', usado: 0, chamados: 0, estoque: null, custo: 0, venda: 0, _c: {} });
+      m.usado += q;
+      if (!m._c[c.id]) { m._c[c.id] = true; m.chamados++; }
+      m.custo += q * (custosPeca[i.peca_id] || 0);
+      m.venda += q * (i.preco_unit != null ? parseFloat(i.preco_unit) : 0);
+    });
   });
   var meses = mesesDoPeriodo();
   return Object.keys(mapa).map(function (k) {
     var d = mapa[k];
     d.porMes = d.usado / meses;
     d.duraMeses = d.porMes > 0 ? (parseFloat(d.estoque) || 0) / d.porMes : null;
+    d.margem = d.venda - d.custo;
     return d;
   }).sort(function (a, b) { return b.usado - a.usado || String(a.codigo).localeCompare(String(b.codigo)); });
+}
+
+// Consumo agrupado por marca da peça.
+function dadosPorMarca() {
+  var por = {};
+  dadosConsumo().forEach(function (d) {
+    if (!(d.usado > 0)) return;
+    var k = d.marca || 'Sem marca';
+    var m = por[k] || (por[k] = { marca: k, pecas: 0, usado: 0, custo: 0, venda: 0 });
+    m.pecas += 1; m.usado += d.usado; m.custo += d.custo; m.venda += d.venda;
+  });
+  return Object.keys(por).map(function (k) { por[k].margem = por[k].venda - por[k].custo; return por[k]; })
+    .sort(function (a, b) { return b.usado - a.usado; });
 }
 
 function textoDura(d) {
@@ -140,26 +178,116 @@ function abaConsumo() {
   var dados = dadosConsumo();
   var usadas = dados.filter(function (d) { return d.usado > 0; });
   var total = dados.reduce(function (s, d) { return s + d.usado; }, 0);
+  var venda = dados.reduce(function (s, d) { return s + d.venda; }, 0);
+  var custo = dados.reduce(function (s, d) { return s + d.custo; }, 0);
   var maximo = dados.length && dados[0].usado > 0 ? dados[0].usado : 1;
-  var chamados = dados.reduce(function (s, d) { return s + d.chamados; }, 0);
   var semEstoque = dados.filter(function (d) { return (parseFloat(d.estoque) || 0) <= 0; }).length;
   var linhas = dados.map(function (d) {
     var zerado = (parseFloat(d.estoque) || 0) <= 0;
     var alerta = zerado ? ' <span class="badge badge-warning">Sem estoque</span>' : '';
-    return '<tr><td>' + esc(d.codigo) + '</td><td>' + esc(d.desc) + '</td>' +
+    return '<tr><td>' + esc(d.codigo) + '</td><td>' + esc(d.desc) + '</td><td>' + esc(d.marca || '—') + '</td>' +
       '<td class="num">' + (d.usado > 0 ? '<span class="barra" style="width:' + Math.max(2, Math.round(d.usado / maximo * 90)) + 'px"></span>' : '') + fmtNum(d.usado) + '</td>' +
       '<td class="num">' + d.chamados + '</td><td class="num">' + fmtNum(d.estoque) + alerta + '</td>' +
-      '<td class="num">' + textoDura(d) + '</td></tr>';
+      '<td class="num">' + textoDura(d) + '</td>' +
+      '<td class="num">' + (d.usado > 0 ? fmtReais(d.custo) : '—') + '</td><td class="num">' + (d.usado > 0 ? fmtReais(d.venda) : '—') + '</td>' +
+      '<td class="num">' + (d.usado > 0 ? fmtReais(d.margem) : '—') + '</td></tr>';
+  });
+  var marcas = dadosPorMarca();
+  var linhasMarca = marcas.map(function (m) {
+    return '<tr><td>' + esc(m.marca) + '</td><td class="num">' + m.pecas + '</td><td class="num">' + fmtNum(m.usado) + '</td>' +
+      '<td class="num">' + fmtReais(m.custo) + '</td><td class="num">' + fmtReais(m.venda) + '</td><td class="num">' + fmtReais(m.margem) + '</td></tr>';
   });
   return kpis([
     { rotulo: 'Peças usadas no período', valor: usadas.length, cor: '#d93035' },
     { rotulo: 'Unidades consumidas', valor: fmtNum(total) },
-    { rotulo: 'Usos em chamados', valor: chamados },
+    { rotulo: 'Venda das peças', valor: fmtReais(venda), cor: '#2e9e5b' },
+    { rotulo: 'Custo das peças', valor: fmtReais(custo) },
+    { rotulo: 'Margem', valor: fmtReais(venda - custo), cor: '#1b1b18' },
     { rotulo: 'Peças sem estoque', valor: semEstoque }
   ]) + cabecalho('Consumo e estoque de peças — ' + periodo().texto, 'exp-consumo') +
-    tabela([{ t: 'Código' }, { t: 'Peça' }, { t: 'Consumido no período', num: true }, { t: 'Chamados', num: true }, { t: 'Estoque atual', num: true }, { t: 'Estoque dura', num: true }], linhas,
+    tabela([{ t: 'Código' }, { t: 'Peça' }, { t: 'Marca' }, { t: 'Consumido no período', num: true }, { t: 'Chamados', num: true }, { t: 'Estoque atual', num: true }, { t: 'Estoque dura', num: true },
+            { t: 'Custo', num: true }, { t: 'Venda', num: true }, { t: 'Margem', num: true }], linhas,
       'Nenhuma peça cadastrada no estoque.') +
-    '<p class="rel-nota" style="margin-top:10px;">"Estoque dura" estima por quantos meses o saldo atual cobre o consumo médio mensal do período escolhido. Chamados com orçamento recusado não entram (a peça não foi usada).</p>';
+    '<div class="rel-acoes" style="margin-top:22px;"><h2>Consumo por marca — ' + periodo().texto + '</h2><button type="button" class="btn btn-outline" id="exp-marca">Exportar Excel</button></div>' +
+    tabela([{ t: 'Marca' }, { t: 'Peças diferentes', num: true }, { t: 'Consumido', num: true }, { t: 'Custo', num: true }, { t: 'Venda', num: true }, { t: 'Margem', num: true }], linhaMarcaOuVazio(linhasMarca),
+      'Nenhuma peça usada neste período.') +
+    '<p class="rel-nota" style="margin-top:10px;">Conta só chamados fechados com serviço feito; orçamento recusado e devolvido não usa peça. O <b>custo</b> é o custo atual cadastrado no estoque; a <b>venda</b> é o preço de venda da peça no momento em que entrou no chamado. "Estoque dura" estima por quantos meses o saldo atual cobre o consumo médio mensal do período.</p>';
+}
+function linhaMarcaOuVazio(l) { return l; }
+
+/* ---------- Tempo de atendimento por produto (interno e externo) ---------- */
+function fmtDuracao(h) {
+  if (h == null || isNaN(h)) return '—';
+  var min = Math.round(h * 60);
+  if (min < 60) return min + ' min';
+  var horas = Math.floor(min / 60), resto = min % 60;
+  if (horas < 24) return horas + ' h' + (resto ? ' ' + resto + ' min' : '');
+  var dias = Math.floor(horas / 24);
+  return dias + ' d' + (horas % 24 ? ' ' + (horas % 24) + ' h' : '');
+}
+
+// Chamados fechados com serviço feito e com início registrado: tempo de atendimento = do "Iniciar" até o "Fechar".
+function medidosTempo() {
+  return chamadosPeriodo.filter(function (c) { return c.status === 'concluida' && !c.devolvido && c.iniciado_em && c.fechado_em; }).map(function (c) {
+    var eq = c.equipamentos || {};
+    return {
+      c: c,
+      produto: [eq.marca, eq.modelo].filter(Boolean).join(' ') || 'Não informado',
+      lado: c.tipo === 'oficina' ? 'interno' : 'externo',
+      tecnico: nomesTecnicos[c.tecnico_id] || 'Não identificado',
+      atend: (new Date(c.fechado_em) - new Date(c.iniciado_em)) / 3600000
+    };
+  }).filter(function (m) { return m.atend >= 0; });
+}
+
+function media(l) { return l.length ? l.reduce(function (s, x) { return s + x; }, 0) / l.length : null; }
+
+function dadosTempoProduto() {
+  var por = {};
+  medidosTempo().forEach(function (m) {
+    var p = por[m.produto] || (por[m.produto] = { produto: m.produto, interno: [], externo: [] });
+    p[m.lado].push(m.atend);
+  });
+  return Object.keys(por).map(function (k) {
+    var p = por[k];
+    return { produto: p.produto, nInt: p.interno.length, mediaInt: media(p.interno), nExt: p.externo.length, mediaExt: media(p.externo), total: p.interno.length + p.externo.length };
+  }).sort(function (a, b) { return b.total - a.total; });
+}
+
+function dadosTempoTecnico() {
+  var por = {};
+  medidosTempo().forEach(function (m) {
+    var k = m.tecnico + '|' + m.lado;
+    var t = por[k] || (por[k] = { tecnico: m.tecnico, lado: m.lado, tempos: [] });
+    t.tempos.push(m.atend);
+  });
+  return Object.keys(por).map(function (k) {
+    var t = por[k];
+    return { tecnico: t.tecnico, lado: t.lado === 'interno' ? 'Interno (oficina)' : 'Externo (rua)', n: t.tempos.length, media: media(t.tempos), menor: Math.min.apply(null, t.tempos), maior: Math.max.apply(null, t.tempos) };
+  }).sort(function (a, b) { return b.n - a.n; });
+}
+
+function abaTempo() {
+  var med = medidosTempo();
+  var ints = med.filter(function (m) { return m.lado === 'interno'; }).map(function (m) { return m.atend; });
+  var exts = med.filter(function (m) { return m.lado === 'externo'; }).map(function (m) { return m.atend; });
+  var linhasProd = dadosTempoProduto().map(function (p) {
+    return '<tr><td>' + esc(p.produto) + '</td><td class="num">' + p.nInt + '</td><td class="num">' + fmtDuracao(p.mediaInt) + '</td><td class="num">' + p.nExt + '</td><td class="num">' + fmtDuracao(p.mediaExt) + '</td></tr>';
+  });
+  var linhasTec = dadosTempoTecnico().map(function (t) {
+    return '<tr><td>' + esc(t.tecnico) + '</td><td>' + t.lado + '</td><td class="num">' + t.n + '</td><td class="num">' + fmtDuracao(t.media) + '</td><td class="num">' + fmtDuracao(t.menor) + '</td><td class="num">' + fmtDuracao(t.maior) + '</td></tr>';
+  });
+  return kpis([
+    { rotulo: 'Atendimentos medidos', valor: med.length, cor: '#1b1b18' },
+    { rotulo: 'Tempo médio — interno (oficina)', valor: fmtDuracao(media(ints)), cor: '#d93035' },
+    { rotulo: 'Tempo médio — externo (rua)', valor: fmtDuracao(media(exts)), cor: '#2e9e5b' }
+  ]) +
+  '<div class="rel-acoes"><h2>Por produto — ' + periodo().texto + '</h2><button type="button" class="btn btn-outline" id="exp-tempo-prod">Exportar Excel</button></div>' +
+  tabela([{ t: 'Produto (marca / modelo)' }, { t: 'Interno: chamados', num: true }, { t: 'Interno: tempo médio', num: true }, { t: 'Externo: chamados', num: true }, { t: 'Externo: tempo médio', num: true }], linhasProd,
+    'Nenhum atendimento fechado e medido neste período.') +
+  '<div class="rel-acoes" style="margin-top:22px;"><h2>Por técnico</h2><button type="button" class="btn btn-outline" id="exp-tempo-tec">Exportar Excel</button></div>' +
+  tabela([{ t: 'Técnico' }, { t: 'Atuação' }, { t: 'Chamados', num: true }, { t: 'Tempo médio', num: true }, { t: 'Mais rápido', num: true }, { t: 'Mais lento', num: true }], linhasTec, 'Sem dados neste período.') +
+  '<p class="rel-nota" style="margin-top:10px;">Tempo de atendimento = do <b>Iniciar</b> até o <b>Fechar</b> o chamado. Conta só chamados fechados com serviço feito (devolvido sem conserto fica de fora). Interno = oficina; externo = rua. Se o chamado ficou aguardando orçamento no meio do caminho, essa espera entra no tempo.</p>';
 }
 
 /* ---------- Oficina: abertos, aprovados, recusados e faturados (mensal e anual) ---------- */
@@ -220,7 +348,7 @@ function abaOficina() {
 
   var linhasDet = ev.map(function (e) {
     var c = e.c;
-    return '<tr><td>' + fmtData(e.data.toISOString()) + '</td><td>' + EVENTO_OFICINA[e.tipo] + '</td><td>' + c.numero + '</td><td>' + esc(nomeCliente(c)) + '</td><td>' + esc(equipamentoTexto(c)) +
+    return '<tr><td>' + fmtData(e.data.toISOString()) + '</td><td>' + EVENTO_OFICINA[e.tipo] + '</td><td>' + numChamado(c) + '</td><td>' + esc(nomeCliente(c)) + '</td><td>' + esc(equipamentoTexto(c)) +
       '</td><td>' + esc((c.descricao_defeito || '').slice(0, 100)) + '</td></tr>';
   });
 
@@ -245,7 +373,7 @@ function abaAbertos() {
   chamadosPeriodo.forEach(function (c) { cont[c.status] = (cont[c.status] || 0) + 1; });
   var aindaAbertos = chamadosPeriodo.filter(function (c) { return STATUS_ABERTOS.indexOf(c.status) !== -1; });
   var linhas = aindaAbertos.map(function (c) {
-    return '<tr><td>' + c.numero + '</td><td>' + fmtData(c.created_at) + '</td><td>' + esc(nomeCliente(c)) + '</td><td>' + esc(equipamentoTexto(c)) +
+    return '<tr><td>' + numChamado(c) + '</td><td>' + fmtData(c.created_at) + '</td><td>' + esc(nomeCliente(c)) + '</td><td>' + esc(equipamentoTexto(c)) +
       '</td><td>' + esc((c.descricao_defeito || '').slice(0, 120)) + '</td><td>' + STATUS_LABELS[c.status] + '</td><td class="num">' + diasDesde(c.created_at) + '</td></tr>';
   });
   return kpis([
@@ -280,7 +408,7 @@ function abaBacklog() {
   });
   var linhas = lista.map(function (i) {
     var c = i.c;
-    return '<tr><td>' + c.numero + '</td><td>' + fmtData(c.created_at) + '</td><td>' + esc(nomeCliente(c)) + '</td><td>' + esc(equipamentoTexto(c)) +
+    return '<tr><td>' + numChamado(c) + '</td><td>' + fmtData(c.created_at) + '</td><td>' + esc(nomeCliente(c)) + '</td><td>' + esc(equipamentoTexto(c)) +
       '</td><td>' + STATUS_LABELS[c.status] + '</td><td class="num ' + (i.dias > 30 ? 'atraso' : '') + '">' + i.dias + '</td></tr>';
   });
   return kpis([
@@ -307,10 +435,10 @@ function abaManutencao() {
     if (!k) return;
     if (!porDefeito[k]) porDefeito[k] = { defeito: c.descricao_defeito.trim().slice(0, 80), n: 0, pecas: {} };
     porDefeito[k].n += 1;
-    if (c.estoque_pecas && c.status !== 'nao_aprovada') {
-      var cod = c.estoque_pecas.codigo;
-      porDefeito[k].pecas[cod] = (porDefeito[k].pecas[cod] || 0) + (parseFloat(c.quantidade_peca_utilizada) || 0);
-    }
+    pecasUsadas(c).forEach(function (i) {
+      var cod = (i.estoque_pecas || {}).codigo || '—';
+      porDefeito[k].pecas[cod] = (porDefeito[k].pecas[cod] || 0) + (parseFloat(i.quantidade) || 0);
+    });
   });
   var topDefeitos = Object.keys(porDefeito).map(function (k) { return porDefeito[k]; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 15);
   var linhasDefeito = topDefeitos.map(function (d) {
@@ -328,15 +456,16 @@ function abaManutencao() {
     .map(function (k) { return '<tr><td>' + esc(k) + '</td><td class="num">' + porEquip[k] + '</td></tr>'; });
 
   var linhas = itens.map(function (c) {
-    var pecaTxt = c.estoque_pecas && c.status !== 'nao_aprovada' ? esc(c.estoque_pecas.codigo + ' — ' + (c.estoque_pecas.tipo_modelo || '')) : '—';
-    return '<tr><td>' + c.numero + '</td><td>' + fmtData(c.created_at) + '</td><td>' + esc(nomeCliente(c)) + '</td><td>' + esc(equipamentoTexto(c)) +
+    var usadasC = pecasUsadas(c);
+    var pecaTxt = usadasC.length ? esc(usadasC.map(function (i) { var p = i.estoque_pecas || {}; return p.codigo + ' ×' + fmtNum(i.quantidade); }).join(', ')) : '—';
+    return '<tr><td>' + numChamado(c) + '</td><td>' + fmtData(c.created_at) + '</td><td>' + esc(nomeCliente(c)) + '</td><td>' + esc(equipamentoTexto(c)) +
       '</td><td>' + esc((c.descricao_defeito || '').slice(0, 140)) + '</td><td>' + pecaTxt + '</td><td class="num">' +
-      (c.peca_id && c.status !== 'nao_aprovada' ? fmtNum(c.quantidade_peca_utilizada) : '') + '</td><td>' + STATUS_LABELS[c.status] + '</td></tr>';
+      (usadasC.length ? fmtNum(usadasC.reduce(function (s2, i) { return s2 + (parseFloat(i.quantidade) || 0); }, 0)) : '') + '</td><td>' + STATUS_LABELS[c.status] + '</td></tr>';
   });
 
   return kpis([
     { rotulo: 'Chamados no período', valor: itens.length, cor: '#1b1b18' },
-    { rotulo: 'Com peça utilizada', valor: itens.filter(function (c) { return c.peca_id && c.status !== 'nao_aprovada'; }).length, cor: '#d93035' },
+    { rotulo: 'Com peça utilizada', valor: itens.filter(function (c) { return pecasUsadas(c).length > 0; }).length, cor: '#d93035' },
     { rotulo: 'Concluídos', valor: itens.filter(function (c) { return c.status === 'concluida'; }).length, cor: '#2e9e5b' }
   ]) +
     '<h3 class="rel-sub">Defeitos mais repetidos e peças usadas</h3>' +
@@ -352,7 +481,7 @@ function abaManutencao() {
 /* ---------- desenho + exportação ---------- */
 function desenhar() {
   if (!carregou) return;
-  var html = abaAtual === 'oficina' ? abaOficina() : abaAtual === 'consumo' ? abaConsumo() : abaAtual === 'abertos' ? abaAbertos() : abaAtual === 'backlog' ? abaBacklog() : abaManutencao();
+  var html = abaAtual === 'tempo' ? abaTempo() : abaAtual === 'oficina' ? abaOficina() : abaAtual === 'consumo' ? abaConsumo() : abaAtual === 'abertos' ? abaAbertos() : abaAtual === 'backlog' ? abaBacklog() : abaManutencao();
   $('painel').innerHTML = html;
   ligarExportacoes();
 }
@@ -372,7 +501,7 @@ function ligarExportacoes() {
     exportarExcel('oficina-detalhe-' + sufixo + '.xlsx', d, [
       { titulo: 'Data', valor: function (e) { return fmtData(e.data.toISOString()); } },
       { titulo: 'Evento', valor: function (e) { return EVENTO_OFICINA[e.tipo]; } },
-      { titulo: 'Nº', valor: function (e) { return e.c.numero; } },
+      { titulo: 'Nº', valor: function (e) { return numChamado(e.c); } },
       { titulo: 'Cliente', valor: function (e) { return nomeCliente(e.c); } },
       { titulo: 'Equipamento', valor: function (e) { return equipamentoTexto(e.c); } },
       { titulo: 'Defeito', valor: function (e) { return e.c.descricao_defeito || ''; } }
@@ -382,12 +511,45 @@ function ligarExportacoes() {
     var d = dadosConsumo();
     if (!d.length) { showToast('Não há dados para exportar.', 'warning'); return; }
     exportarExcel('consumo-pecas-' + sufixo + '.xlsx', d, [
-      { titulo: 'Código', chave: 'codigo' }, { titulo: 'Peça', chave: 'desc' },
+      { titulo: 'Código', chave: 'codigo' }, { titulo: 'Peça', chave: 'desc' }, { titulo: 'Marca', chave: 'marca' },
       { titulo: 'Consumido no período', valor: function (x) { return x.usado; } }, { titulo: 'Chamados', chave: 'chamados' },
       { titulo: 'Estoque atual', valor: function (x) { return parseFloat(x.estoque); } },
       { titulo: 'Consumo médio por mês', valor: function (x) { return Math.round(x.porMes * 100) / 100; } },
-      { titulo: 'Estoque dura (meses)', valor: function (x) { return x.duraMeses == null ? '' : Math.round(x.duraMeses * 10) / 10; } }
+      { titulo: 'Estoque dura (meses)', valor: function (x) { return x.duraMeses == null ? '' : Math.round(x.duraMeses * 10) / 10; } },
+      { titulo: 'Custo (R$)', valor: function (x) { return Math.round(x.custo * 100) / 100; } },
+      { titulo: 'Venda (R$)', valor: function (x) { return Math.round(x.venda * 100) / 100; } },
+      { titulo: 'Margem (R$)', valor: function (x) { return Math.round(x.margem * 100) / 100; } }
     ], 'Consumo');
+  });
+  if ((b = $('exp-marca'))) b.addEventListener('click', function () {
+    var d = dadosPorMarca();
+    if (!d.length) { showToast('Não há dados para exportar.', 'warning'); return; }
+    exportarExcel('consumo-por-marca-' + sufixo + '.xlsx', d, [
+      { titulo: 'Marca', chave: 'marca' }, { titulo: 'Peças diferentes', chave: 'pecas' }, { titulo: 'Consumido', chave: 'usado' },
+      { titulo: 'Custo (R$)', valor: function (x) { return Math.round(x.custo * 100) / 100; } },
+      { titulo: 'Venda (R$)', valor: function (x) { return Math.round(x.venda * 100) / 100; } },
+      { titulo: 'Margem (R$)', valor: function (x) { return Math.round(x.margem * 100) / 100; } }
+    ], 'Marcas');
+  });
+  if ((b = $('exp-tempo-prod'))) b.addEventListener('click', function () {
+    var d = dadosTempoProduto();
+    if (!d.length) { showToast('Não há dados para exportar.', 'warning'); return; }
+    exportarExcel('tempo-atendimento-produto-' + sufixo + '.xlsx', d, [
+      { titulo: 'Produto', chave: 'produto' }, { titulo: 'Interno: chamados', chave: 'nInt' },
+      { titulo: 'Interno: tempo médio (h)', valor: function (x) { return x.mediaInt == null ? '' : Math.round(x.mediaInt * 100) / 100; } },
+      { titulo: 'Externo: chamados', chave: 'nExt' },
+      { titulo: 'Externo: tempo médio (h)', valor: function (x) { return x.mediaExt == null ? '' : Math.round(x.mediaExt * 100) / 100; } }
+    ], 'Por produto');
+  });
+  if ((b = $('exp-tempo-tec'))) b.addEventListener('click', function () {
+    var d = dadosTempoTecnico();
+    if (!d.length) { showToast('Não há dados para exportar.', 'warning'); return; }
+    exportarExcel('tempo-atendimento-tecnico-' + sufixo + '.xlsx', d, [
+      { titulo: 'Técnico', chave: 'tecnico' }, { titulo: 'Atuação', chave: 'lado' }, { titulo: 'Chamados', chave: 'n' },
+      { titulo: 'Tempo médio (h)', valor: function (x) { return Math.round(x.media * 100) / 100; } },
+      { titulo: 'Mais rápido (h)', valor: function (x) { return Math.round(x.menor * 100) / 100; } },
+      { titulo: 'Mais lento (h)', valor: function (x) { return Math.round(x.maior * 100) / 100; } }
+    ], 'Por técnico');
   });
   if ((b = $('exp-abertos'))) b.addEventListener('click', function () {
     var d = chamadosPeriodo.filter(function (c) { return STATUS_ABERTOS.indexOf(c.status) !== -1; });
@@ -406,7 +568,7 @@ function ligarExportacoes() {
 
 function colunasChamado(comDias) {
   var cols = [
-    { titulo: 'Nº', chave: 'numero' },
+    { titulo: 'Nº', valor: numChamado },
     { titulo: 'Abertura', valor: function (c) { return fmtData(c.created_at); } },
     { titulo: 'Cliente', valor: nomeCliente },
     { titulo: 'Equipamento', valor: equipamentoTexto },
@@ -415,8 +577,7 @@ function colunasChamado(comDias) {
   ];
   if (comDias) cols.push({ titulo: 'Dias em aberto', valor: function (c) { return diasDesde(c.created_at); } });
   else {
-    cols.push({ titulo: 'Peça', valor: function (c) { return c.estoque_pecas && c.status !== 'nao_aprovada' ? c.estoque_pecas.codigo : ''; } });
-    cols.push({ titulo: 'Qtd peça', valor: function (c) { return c.peca_id && c.status !== 'nao_aprovada' ? parseFloat(c.quantidade_peca_utilizada) : ''; } });
+    cols.push({ titulo: 'Peças', valor: function (c) { return pecasUsadas(c).map(function (i) { return ((i.estoque_pecas || {}).codigo || '') + ' x' + i.quantidade; }).join('; '); } });
     cols.push({ titulo: 'Resolução', chave: 'resolucao' });
   }
   return cols;

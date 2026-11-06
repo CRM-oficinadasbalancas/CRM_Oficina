@@ -22,7 +22,7 @@
     <a href="vendas.html" data-role="atendente vendedor">Vendas</a>
     <a href="manutencao.html" data-role="vendedor">Manutenção</a>
     <a href="pos-venda.html" data-role="atendente vendedor">Pós-venda</a>
-    <a href="chamados.html" data-role="programadora recepcao tecnico oficina_interna">Chamados</a>
+    <a href="chamados.html" data-role="programadora recepcao tecnico oficina_interna financeiro">Chamados</a>
     <a href="relatorios.html" data-role="admin">Relatórios</a>
     <a href="estoque.html" class="active" data-role="admin">Estoque</a>
     <a href="clientes.html" data-role="atendente programadora recepcao">Clientes</a>
@@ -54,6 +54,20 @@
           <label for="quantidade">Quantidade *</label>
           <input type="text" id="quantidade" maxlength="5" placeholder="Ex: 25 ou 12.5" required>
           <span class="hint">Até 5 caracteres. Separador decimal: ponto (.)</span>
+        </div>
+        <div class="form-field">
+          <label for="marca">Marca</label>
+          <input type="text" id="marca" maxlength="100" placeholder="Ex: Toledo, Filizola">
+        </div>
+        <div class="form-field">
+          <label for="custo">Custo (R$)</label>
+          <input type="text" id="custo" maxlength="12" inputmode="decimal" placeholder="Ex: 35,90">
+          <span class="hint">Só o admin e o financeiro enxergam o custo.</span>
+        </div>
+        <div class="form-field">
+          <label for="preco_venda">Preço de venda (R$)</label>
+          <input type="text" id="preco_venda" maxlength="12" inputmode="decimal" placeholder="Ex: 59,90">
+          <span class="hint">Aparece no orçamento do chamado.</span>
         </div>
         <div class="form-field">
           <label for="localidade">Localidade</label>
@@ -88,13 +102,16 @@
           <tr>
             <th>Código</th>
             <th>Tipo/Modelo</th>
+            <th>Marca</th>
             <th>Quantidade</th>
+            <th>Custo</th>
+            <th>Venda</th>
             <th>Localidade</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="pecas-tbody">
-          <tr><td colspan="5">Carregando...</td></tr>
+          <tr><td colspan="8">Carregando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -107,7 +124,7 @@
     <h3>Importar Peças via Planilha</h3>
     <p style="font-size:0.85rem; color:var(--gray-700); margin-bottom:14px;">
       Use o modelo (botão "Baixar modelo de importação"), preencha as linhas e envie o arquivo .xlsx aqui.
-      Colunas esperadas: Código, Tipo/Modelo, Quantidade, Localidade.
+      Colunas esperadas: Código, Tipo/Modelo, Quantidade, Localidade, Marca, Custo (R$), Preço de venda (R$).
     </p>
     <div class="form-field" style="margin-bottom:14px;">
       <label for="importar-arquivo">Arquivo (.xlsx)</label>
