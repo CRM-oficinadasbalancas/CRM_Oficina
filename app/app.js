@@ -83,7 +83,7 @@ document.querySelectorAll('[data-sair]').forEach(function (b) {
 
 /* ===================== AGENDA ===================== */
 
-var SEL = '*, clientes(razao_social, telefone_empresa, logradouro, numero, bairro, municipio, uf, latitude, longitude), equipamentos(marca, modelo, numero_serie)';
+var SEL = '*, clientes(razao_social, cnpj_cpf, telefone_empresa, contato_nome, contato_telefone, logradouro, numero, bairro, municipio, uf, latitude, longitude), equipamentos(marca, modelo, numero_serie)';
 
 // Abas por perfil: técnico de rua = campo em aberto e fechados; oficina interna = o que está na oficina,
 // aguardando orçamento, orçamento aprovado e fechados.
@@ -318,10 +318,11 @@ function desenharChamado() {
     (c.selo_antigo || c.selo_antigo_ausente ? '<div class="par"><b>Selo antigo</b>' + (c.selo_antigo_ausente ? 'Não possui' : esc(c.selo_antigo)) + '</div>' : '') +
     (c.lacre_antigo || c.lacre_antigo_ausente ? '<div class="par"><b>Lacre antigo</b>' + (c.lacre_antigo_ausente ? 'Não possui' : esc(c.lacre_antigo)) + '</div>' : '');
 
-  var rot = { iniciar: 'Iniciar atendimento', pendencia: 'Transferir para a oficina interna', fechar: 'Fechar chamado', anotar: 'Adicionar anotação', devolver: 'Fechar e devolver ao cliente' };
+  var rot = { iniciar: 'Iniciar atendimento', pendencia: 'Transferir para a oficina interna', fechar: 'Fechar chamado', anotar: 'Adicionar anotação', devolver: 'Fechar e devolver ao cliente', comprovante: 'Comprovante do cliente (PDF / WhatsApp)' };
   var acoes = chAcoes(estado.perfil.role, c).filter(function (a) { return rot[a]; });
+  if (c.status === 'concluida' && c.tipo === 'campo' && ['tecnico', 'admin'].indexOf(estado.perfil.role) !== -1) acoes.push('comprovante');
   $('ch-acoes').innerHTML = acoes.map(function (a) {
-    return '<button type="button" class="btn ' + (a === 'pendencia' || a === 'anotar' ? 'btn-escuro' : 'btn-vermelho') + ' btn-bloco" data-a="' + a + '">' + rot[a] + '</button>';
+    return '<button type="button" class="btn ' + (a === 'pendencia' || a === 'anotar' || a === 'comprovante' ? 'btn-escuro' : 'btn-vermelho') + ' btn-bloco" data-a="' + a + '">' + rot[a] + '</button>';
   }).join('') || '<p class="dica">Nenhuma ação disponível neste status.</p>';
   $('ch-acoes').querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { formAcao(b.dataset.a); }); });
   $('ch-form').innerHTML = '';
@@ -395,6 +396,68 @@ function lerVedacao() {
   };
 }
 
+// Fechamento de chamado de rua: o cliente assina na tela, o sistema gera o comprovante em PDF, guarda no chamado
+// e o técnico envia pelo WhatsApp dele.
+async function fecharRuaComComprovante(c, v, assinatura, nome, naoAssinou) {
+  var btn = $('f-ok'), erro = $('f-erro'), botoes = $('ch-form').querySelectorAll('button'), textoOk = btn.textContent;
+  erro.hidden = true; botoes.forEach(function (b) { b.disabled = true; }); btn.textContent = 'Fechando...';
+  var r = await chFechar(c, estado.sessao.user.id, v);
+  if (r.erro) {
+    botoes.forEach(function (b) { b.disabled = false; }); btn.textContent = textoOk;
+    erro.textContent = r.erro; erro.hidden = false; erro.scrollIntoView({ block: 'center' });
+    return;
+  }
+  avisar('Chamado fechado.', 'ok');
+  var rr = await supabaseClient.from('assistencias_tecnicas').select(SEL).eq('id', c.id).single();
+  estado.atual = rr.data || Object.assign({}, c, r.chamado);
+  carregarAgenda(true);
+  desenharChamado();
+  carregarHistoricoChamado();
+  await comprovanteDoChamado(estado.atual, { assinatura: assinatura, nomeAssinante: nome, naoAssinou: naoAssinou }, true);
+}
+
+// Gera o comprovante em PDF (com a assinatura), guarda no chamado (quando for o fechamento) e mostra as opções de envio.
+async function comprovanteDoChamado(c, ass, salvar) {
+  var box = $('ch-form');
+  box.innerHTML = '<div class="caixa"><p>Gerando o comprovante...</p></div>';
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try {
+    var itens = await chCarregarItens(c.id);
+    if (!ass) ass = await osCarregarAssinaturaSalva(c.id);
+    var logo = await osCarregarLogo();
+    var blob = osGerarPdf({ c: c, itens: itens, assinatura: ass.assinatura, nomeAssinante: ass.nomeAssinante, naoAssinou: ass.naoAssinou, tecnico: estado.perfil.nome_exibicao, logo: logo });
+    var aviso = '';
+    if (salvar) {
+      var sv = await osSalvarDocumentos(c.id, estado.sessao.user.id, blob, ass.assinatura, ass.nomeAssinante, ass.naoAssinou);
+      if (sv.erro) aviso = 'O PDF foi gerado, mas não ficou guardado no sistema (' + sv.erro + '). Você ainda pode enviá-lo abaixo.';
+    }
+    var arquivo = 'OS-' + (c.codigo || c.numero) + '.pdf';
+    var cl = c.clientes || {};
+    var tel = cl.telefone_empresa || cl.contato_telefone;
+    var texto = 'Olá! Segue o comprovante do atendimento ' + (c.codigo || '') + ' da ' + OS_EMPRESA.fantasia + '. Obrigado!';
+    box.innerHTML = '<div class="caixa"><h3 class="sub-titulo" style="margin-top:0;">Comprovante pronto</h3>' +
+      (aviso ? '<p class="erro">' + esc(aviso) + '</p>' : '<p class="dica">Fica guardado neste chamado. Envie o PDF ao cliente pelo seu WhatsApp:</p>') +
+      '<button type="button" class="btn btn-vermelho btn-bloco" id="c-enviar">Enviar pelo WhatsApp</button>' +
+      (osTelefoneWhats(tel) ? '<a class="btn btn-escuro btn-bloco" id="c-wa" href="' + esc(osUrlWhats(tel, texto)) + '" target="_blank" rel="noopener" style="margin-top:8px;">Abrir a conversa com o cliente</a>' : '') +
+      '<button type="button" class="btn btn-escuro btn-bloco" id="c-baixar" style="margin-top:8px;">Salvar o PDF no aparelho</button>' +
+      '<p class="dica" id="c-msg"></p>' +
+      '<button type="button" class="btn btn-bloco" id="c-voltar" style="margin-top:8px; background:#fff; border:1px solid #1b1b18;">Voltar para a agenda</button></div>';
+    $('c-enviar').onclick = async function () {
+      var r = await osCompartilhar(blob, arquivo, texto);
+      if (r.semCompartilhamento) {
+        osBaixar(blob, arquivo);
+        $('c-msg').textContent = 'Este aparelho não anexa arquivo direto no WhatsApp. O PDF foi salvo no aparelho: abra a conversa com o cliente e anexe o arquivo ' + arquivo + '.';
+      }
+    };
+    $('c-baixar').onclick = function () { osBaixar(blob, arquivo); };
+    $('c-voltar').onclick = function () { mostrar('view-agenda'); carregarAgenda(); };
+  } catch (e) {
+    box.innerHTML = '<div class="caixa"><p class="erro">Não foi possível gerar o comprovante: ' + esc(e && e.message ? e.message : e) + '</p>' +
+      '<button type="button" class="btn btn-vermelho btn-bloco" id="c-tentar">Tentar de novo</button></div>';
+    $('c-tentar').onclick = function () { comprovanteDoChamado(c, ass, false); };
+  }
+}
+
 // Enviar para orçamento: peças com preço (somadas no total) + anotação do que precisa ser orçado.
 function formOrcamento(c, textoInicial) {
   var box = $('ch-form');
@@ -432,11 +495,34 @@ async function formAcao(acao) {
     $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; executar(function () { return chPendencia(c, estado.sessao.user.id, v); }, 'Enviado para a oficina interna.', false); };
   } else if (acao === 'fechar') {
     box.innerHTML = '<div class="caixa"><label for="f-hist">Histórico do chamado * — o que foi feito</label><textarea id="f-hist" rows="4" maxlength="5000"></textarea>' + vedacaoHtml(true) +
-      '<div id="f-itens"></div><p class="dica">As peças listadas são as usadas no serviço: o estoque baixa quando o chamado fecha (sem peças, não baixa).</p>' + rodape + '</div>';
+      '<div id="f-itens"></div><p class="dica">As peças listadas são as usadas no serviço: o estoque baixa quando o chamado fecha (sem peças, não baixa).</p>' +
+      (c.tipo === 'campo'
+        ? '<hr><label for="f-ass-nome">Nome de quem recebeu o serviço *</label><input id="f-ass-nome" type="text" maxlength="100" autocomplete="off" value="' + esc((c.clientes || {}).contato_nome || '') + '">' +
+          '<label>Assinatura do cliente * (assine com o dedo)</label><canvas id="f-ass-canvas" class="assinatura-canvas"></canvas>' +
+          '<button type="button" class="btn btn-escuro" id="f-ass-limpar" style="margin-top:6px;">Limpar assinatura</button>' +
+          '<label class="marcar"><input type="checkbox" id="f-ass-nao"> O cliente não pôde ou não quis assinar</label>' +
+          '<p class="dica">Ao fechar, o sistema gera o comprovante em PDF, guarda neste chamado e você envia pelo seu WhatsApp.</p>'
+        : '') + rodape + '</div>';
     ligarFlags();
     itensEditor(c, $('f-itens'));
-    $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; executar(function () { return chFechar(c, estado.sessao.user.id, v); }, 'Chamado fechado.', false); };
+    if (c.tipo === 'campo') {
+      var pad = osAssinaturaPad($('f-ass-canvas'));
+      $('f-ass-limpar').onclick = function () { pad.limpar(); };
+      $('f-ass-nao').onchange = function () { $('f-ass-canvas').classList.toggle('desligada', this.checked); };
+      $('f-ok').onclick = function () {
+        var v = lerVedacao(); v.historico = $('f-hist').value;
+        var nao = $('f-ass-nao').checked, nome = $('f-ass-nome').value.trim(), erro = $('f-erro');
+        if (!nao) {
+          if (!nome) { erro.textContent = 'Informe o nome de quem recebeu o serviço.'; erro.hidden = false; erro.scrollIntoView({ block: 'center' }); return; }
+          if (pad.vazio()) { erro.textContent = 'Peça ao cliente para assinar na tela (ou marque que ele não assinou).'; erro.hidden = false; erro.scrollIntoView({ block: 'center' }); return; }
+        }
+        fecharRuaComComprovante(c, v, nao ? null : pad.dataUrl(), nome, nao);
+      };
+    } else {
+      $('f-ok').onclick = function () { var v = lerVedacao(); v.historico = $('f-hist').value; executar(function () { return chFechar(c, estado.sessao.user.id, v); }, 'Chamado fechado.', false); };
+    }
   }
+  else if (acao === 'comprovante') comprovanteDoChamado(c, null, false);
   box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

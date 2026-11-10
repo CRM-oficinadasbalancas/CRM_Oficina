@@ -246,7 +246,16 @@ $('n-salvar').addEventListener('click', async function () {
   $('modal-novo').classList.remove('open');
   showToast('Chamado ' + chNumero(r.data) + ' aberto.', 'ok');
   carregar();
+  abrirModalAberto(r.data);
 });
+
+// Janela "Chamado aberto": imprimir a OS (abre a folha em outra aba).
+function abrirModalAberto(c) {
+  $('aberto-titulo').textContent = 'Chamado ' + chNumero(c) + ' aberto';
+  $('aberto-imprimir').onclick = function () { window.open('os.html?id=' + c.id + '&auto=1', '_blank'); $('modal-aberto').classList.remove('open'); };
+  $('aberto-fechar').onclick = function () { $('modal-aberto').classList.remove('open'); };
+  $('modal-aberto').classList.add('open');
+}
 
 /* ===================== DETALHE ===================== */
 
@@ -282,6 +291,7 @@ function desenharDetalhe() {
   $('d-acoes').innerHTML = acoes.map(function (a) {
     return '<button type="button" class="btn ' + (a === 'recusar' || a === 'anotar' ? 'btn-outline' : 'btn-primary') + '" data-a="' + a + '">' + rot[a] + '</button>';
   }).join('') || '<span style="color:#8b95a7; font-size:0.88rem;">Nenhuma ação disponível para o seu perfil neste status.</span>';
+  $('d-acoes').insertAdjacentHTML('beforeend', ' <a class="btn btn-outline" href="os.html?id=' + c.id + '" target="_blank" rel="noopener">Imprimir OS</a>');
   $('d-acoes').querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { painelAcao(b.dataset.a); }); });
   $('d-painel').innerHTML = '';
   carregarItensDetalhe();

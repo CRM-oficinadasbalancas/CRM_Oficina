@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ordem de Serviço — Oficina das Balanças</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111; background: #e9e9e6; }
+  .barra-tela { position: sticky; top: 0; background: #1b1b18; color: #fff; padding: 10px 16px; display: flex; gap: 12px; align-items: center; z-index: 5; }
+  .barra-tela button { font: inherit; font-weight: 700; padding: 8px 18px; border: 0; border-radius: 4px; background: #d93035; color: #fff; cursor: pointer; }
+  .barra-tela span { font-size: 0.9rem; opacity: 0.85; }
+  .folha { width: 210mm; min-height: 297mm; margin: 14px auto; background: #fff; padding: 8mm; box-shadow: 0 2px 12px rgba(0,0,0,0.2); }
+  .via { height: 136mm; overflow: hidden; padding: 1mm 1mm 3mm; border-bottom: 1px dashed #777; position: relative; font-size: 9.5pt; }
+  .via:last-child { border-bottom: 0; }
+  .topo { display: flex; align-items: center; gap: 4mm; border-bottom: 2px solid #1b1b18; padding-bottom: 2mm; }
+  .topo img { height: 10mm; }
+  .topo .emp { flex: 1; font-size: 7.5pt; line-height: 1.3; }
+  .topo .emp b { font-size: 11pt; }
+  .topo .num { text-align: right; }
+  .topo .num .os { font-size: 15pt; font-weight: 700; }
+  .topo .num .via-nome { font-size: 8pt; color: #555; text-transform: uppercase; }
+  h2 { margin: 2mm 0 0.6mm; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.04em; color: #b4251f; }
+  .grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6mm 4mm; }
+  .grade .s2 { grid-column: span 2; }
+  .grade .s4 { grid-column: 1 / -1; }
+  .c b { display: block; font-size: 7pt; text-transform: uppercase; color: #666; }
+  .c span { display: block; min-height: 4.2mm; border-bottom: 1px solid #ccc; }
+  .branco { border-bottom: 1px solid #888; height: 6mm; }
+  .caixa-ass { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-top: 7mm; }
+  .caixa-ass div { border-top: 1px solid #111; padding-top: 1mm; text-align: center; font-size: 8pt; }
+  .opc { margin-top: 2mm; font-size: 9pt; }
+  .recorte { position: absolute; right: 0; bottom: 0.3mm; font-size: 7pt; color: #777; background: #fff; padding: 0 2mm; }
+  @page { size: A4; margin: 0; }
+  @media print {
+    body { background: #fff; }
+    .barra-tela { display: none; }
+    .folha { margin: 0; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="barra-tela">
+  <button type="button" id="btn-imprimir">Imprimir</button>
+  <span id="msg">Carregando a OS...</span>
+</div>
+
+<main class="folha" id="folha"></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/admin-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/os-lib.js"></script>
+<script>
+  function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function campo(rot, val, cls) { return '<div class="c' + (cls ? ' ' + cls : '') + '"><b>' + rot + '</b><span>' + esc(val) + '</span></div>'; }
+
+  function via(c, nomeVia, extra) {
+    var cl = c.clientes || {}, eq = c.equipamentos || {};
+    var rua = c.tipo === 'campo';
+    var h = '<section class="via">' +
+      '<div class="topo"><img src="../assets/img/logo-oficina.webp" alt="">' +
+        '<div class="emp"><b>' + esc(OS_EMPRESA.fantasia) + '</b><br>' + esc(OS_EMPRESA.nome) + ' — CNPJ ' + esc(OS_EMPRESA.cnpj) + '<br>' + esc(OS_EMPRESA.endereco) + '<br>Tel. ' + esc(OS_EMPRESA.telefone) + ' · ' + esc(OS_EMPRESA.email) + '</div>' +
+        '<div class="num"><div class="via-nome">Ordem de serviço — ' + nomeVia + '</div><div class="os">' + esc(c.codigo || c.numero) + '</div><div>' + (rua ? 'Rua (externo)' : 'Oficina interna') + '</div></div></div>' +
+      '<h2>Cliente</h2><div class="grade">' +
+        campo('Nome', cl.razao_social, 's2') + campo('CNPJ/CPF', cl.cnpj_cpf) + campo('Telefone', cl.telefone_empresa) +
+        campo('Endereço', osEnderecoCliente(cl), 's4') +
+      '</div>' +
+      '<h2>Equipamento</h2><div class="grade">' +
+        campo('Marca / modelo', [eq.marca, eq.modelo].filter(Boolean).join(' '), 's2') + campo('Nº de série', eq.numero_serie, 's2') +
+        campo('Defeito relatado', c.descricao_defeito, 's4') +
+      '</div>' +
+      '<h2>Atendimento</h2><div class="grade">' +
+        campo('Abertura', osDataHora(c.created_at)) + campo(rua ? 'Visita agendada' : 'Recebido por', rua ? osData(c.data_agendada) : extra.recepcao) + campo('Técnico responsável', extra.tecnico, 's2') +
+        (rua ? '' : campo('Selo antigo', c.selo_antigo_ausente ? 'Não possui' : c.selo_antigo, 's2') + campo('Lacre antigo', c.lacre_antigo_ausente ? 'Não possui' : c.lacre_antigo, 's2')) +
+      '</div>' +
+      '<h2>Diagnóstico / serviço executado / peças</h2><div class="branco"></div><div class="branco"></div>' +
+      '<div class="grade" style="margin-top:2mm;"><div class="c s2"><b>Selo novo</b><span>&nbsp;</span></div><div class="c s2"><b>Lacre novo</b><span>&nbsp;</span></div></div>' +
+      '<div class="opc">Orçamento: &nbsp; ( ) aprovado &nbsp; ( ) recusado &nbsp;&nbsp;&nbsp; Valor: R$ ______________ &nbsp;&nbsp;&nbsp; Data: ____/____/______</div>' +
+      '<div class="caixa-ass"><div>Assinatura do cliente</div><div>Assinatura do técnico</div></div>' +
+      (nomeVia === 'via da oficina' ? '<span class="recorte">✂ recortar</span>' : '') +
+      '</section>';
+    return h;
+  }
+
+  (async function () {
+    var auth = await window.ADMIN_AUTH_READY;
+    if (!auth) return;
+    var qs = new URLSearchParams(location.search), id = qs.get('id');
+    var msg = document.getElementById('msg');
+    if (!id) { msg.textContent = 'Chamado não informado.'; return; }
+
+    var r = await supabaseClient.from('assistencias_tecnicas')
+      .select('*, clientes(razao_social, cnpj_cpf, telefone_empresa, logradouro, numero, bairro, municipio, uf), equipamentos(marca, modelo, numero_serie)')
+      .eq('id', id).single();
+    if (r.error || !r.data) { msg.textContent = 'Não foi possível abrir este chamado: ' + (r.error ? r.error.message : 'não encontrado'); return; }
+    var c = r.data;
+
+    var tec = await supabaseClient.rpc('listar_tecnicos');
+    var nomeTec = ((tec.data || []).find(function (t) { return t.id === c.tecnico_id; }) || {}).nome || '';
+    var h = await supabaseClient.from('chamado_historico').select('autor_nome').eq('chamado_id', id).order('created_at', { ascending: true }).limit(1);
+    var recepcao = (h.data && h.data[0] && h.data[0].autor_nome) || '';
+    var extra = { tecnico: nomeTec, recepcao: recepcao };
+
+    document.getElementById('folha').innerHTML = via(c, 'via da oficina', extra) + via(c, 'via do cliente', extra);
+    document.title = 'OS ' + (c.codigo || c.numero) + ' — Oficina das Balanças';
+    msg.textContent = 'OS ' + (c.codigo || c.numero) + ' pronta. Duas vias na mesma folha.';
+    document.getElementById('btn-imprimir').onclick = function () { window.print(); };
+
+    if (qs.get('auto') === '1') {
+      var imgs = Array.prototype.slice.call(document.images);
+      await Promise.all(imgs.map(function (i) { return i.complete ? 1 : new Promise(function (ok) { i.onload = i.onerror = ok; }); }));
+      window.print();
+    }
+  })();
+</script>
+</body>
+</html>
