@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Integrações — CRM Oficina das Balanças</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="../assets/img/favicon-192.png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="css/tema-oficina.css">
+<style>
+  .escopos { display: grid; gap: 10px; margin-bottom: 16px; }
+  .escopos label { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; cursor: pointer; }
+  .escopos input { margin-top: 4px; }
+  .escopos small { display: block; color: var(--gray-700, #555); }
+  pre.codigo { background: #1b1b18; color: #f3f3ef; padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5; margin: 6px 0 14px; }
+  .chave-box { font-family: Consolas, monospace; background: #f3f3ef; border: 1px dashed #8b8b85; border-radius: 6px; padding: 12px; word-break: break-all; font-size: 0.95rem; margin: 10px 0 14px; }
+  .doc-tabela td:first-child { white-space: nowrap; font-family: Consolas, monospace; font-size: 0.85rem; }
+</style>
+</head>
+<body class="admin-body">
+
+<header class="admin-header">
+  <a href="dashboard.html" class="admin-brand"><img src="../assets/img/logo-oficina-branca.png" alt="Oficina das Balanças"></a>
+  <nav class="admin-nav">
+    <a href="dashboard.html" data-role="atendente">Dashboard</a>
+    <a href="vendas.html" data-role="atendente vendedor">Vendas</a>
+    <a href="manutencao.html" data-role="vendedor">Manutenção</a>
+    <a href="pos-venda.html" data-role="atendente vendedor">Pós-venda</a>
+    <a href="chamados.html" data-role="programadora recepcao tecnico oficina_interna financeiro">Chamados</a>
+    <a href="relatorios.html" data-role="admin">Relatórios</a>
+    <a href="estoque.html" data-role="admin">Estoque</a>
+    <a href="clientes.html" data-role="atendente programadora recepcao">Clientes</a>
+    <a href="usuarios.html" data-role="admin">Usuários</a>
+    <a href="integracoes.html" class="active" data-role="admin">Integrações</a>
+  </nav>
+  <div class="admin-user">
+    <span>Olá, <span data-user-name>—</span></span>
+    <a href="trocar-senha.html" style="color:#cfd9ea; font-size:0.85rem;">Trocar senha</a>
+    <button data-logout>Sair</button>
+  </div>
+</header>
+
+<main class="admin-main">
+  <h1 class="admin-title">Integrações (API)</h1>
+
+  <div class="admin-card">
+    <h2>Nova chave de acesso</h2>
+    <p style="margin:0 0 14px; color:var(--gray-700);">Cada sistema que for se conectar (planilha, site, ERP, automação) usa a <b>sua própria chave</b>. Se um deles deixar de ser usado, revogue só a chave dele.</p>
+    <form id="chave-form">
+      <div class="form-field" style="max-width:420px; margin-bottom:16px;">
+        <label for="chave-nome">Nome da integração *</label>
+        <input type="text" id="chave-nome" maxlength="80" required placeholder="Ex.: Planilha de preços, Site, ERP">
+      </div>
+      <div class="escopos">
+        <label><input type="checkbox" id="esc-precos" checked><span><b>Lista de preços</b><small>Código, marca, modelo e preço de venda das peças.</small></span></label>
+        <label><input type="checkbox" id="esc-custos"><span><b>Custo das peças</b> (sensível)<small>Soma o custo à lista de preços. Libere só para quem pode ver a margem.</small></span></label>
+        <label><input type="checkbox" id="esc-clientes"><span><b>Clientes</b> (dados pessoais)<small>Cadastro completo: documento, endereço, telefones, e-mails, contato e equipamentos.</small></span></label>
+      </div>
+      <p id="chave-erro" class="error-message" style="display:none;"></p>
+      <div class="form-actions"><button type="submit" class="btn btn-primary" id="chave-criar">Criar chave</button></div>
+    </form>
+  </div>
+
+  <div class="admin-card">
+    <h2>Chaves criadas</h2>
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead><tr><th>Integração</th><th>Chave</th><th>Permissões</th><th>Criada em</th><th>Último uso</th><th>Usos</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="chaves-tbody"><tr><td colspan="8">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="admin-card">
+    <h2>Como usar</h2>
+    <p style="margin:0 0 4px;">Endereço base: <b id="base-url"></b></p>
+    <p style="margin:0 0 14px;">Envie a chave no cabeçalho <code>Authorization: Bearer SUA_CHAVE</code> (ou <code>X-API-Key: SUA_CHAVE</code>). A API é <b>somente leitura</b> (GET).</p>
+    <div class="table-scroll">
+      <table class="admin-table doc-tabela">
+        <thead><tr><th>Recurso</th><th>O que devolve</th><th>Permissão</th></tr></thead>
+        <tbody>
+          <tr><td>GET /api/v1/precos</td><td>Código, marca, modelo, preço de venda (+ custo, se a chave tiver a permissão) e data de atualização.</td><td>Lista de preços</td></tr>
+          <tr><td>GET /api/v1/clientes</td><td>Cadastro completo dos clientes (use <code>incluir=equipamentos</code> para trazer as balanças).</td><td>Clientes</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin:14px 0 4px;"><b>Filtros</b> (opcionais, combináveis):</p>
+    <ul style="margin:0 0 14px 18px; line-height:1.7;">
+      <li><code>q</code> — busca por texto (preços: código, modelo ou marca; clientes: nome, fantasia, CNPJ/CPF ou código)</li>
+      <li><code>marca</code> (preços) · <code>uf</code>, <code>municipio</code>, <code>id</code> (clientes)</li>
+      <li><code>atualizado_desde</code> — só o que mudou desde a data (ex.: <code>2026-11-01</code>), ótimo para sincronizar sem baixar tudo</li>
+      <li><code>incluir_leads=1</code> — clientes: inclui também quem ainda é lead (por padrão vêm só os clientes)</li>
+      <li><code>limite</code> (até 1000, padrão 500) e <code>pagina</code> — o campo <code>paginacao.total</code> diz quantos registros existem</li>
+      <li><code>formato=csv</code> — devolve planilha (separador ponto e vírgula, abre direto no Excel)</li>
+    </ul>
+    <p style="margin:0 0 4px;"><b>Exemplo (terminal):</b></p>
+    <pre class="codigo" id="ex-curl"></pre>
+    <p style="margin:0 0 4px;"><b>Exemplo (JavaScript):</b></p>
+    <pre class="codigo" id="ex-js"></pre>
+    <p style="margin:0; color:var(--gray-700);">No Excel (Dados → Obter dados → Da Web → Avançado) e no Power BI, informe o endereço e o cabeçalho <code>Authorization</code>. Make, Zapier, n8n e Power Automate também aceitam esse cabeçalho no módulo de requisição HTTP.</p>
+  </div>
+</main>
+
+<!-- CHAVE CRIADA: aparece uma única vez -->
+<div class="modal-overlay" id="modal-chave">
+  <div class="modal-box" style="max-width:560px;">
+    <h3>Chave criada</h3>
+    <p style="margin:0;"><b>Copie agora.</b> Por segurança, ela não será mostrada de novo — o sistema guarda apenas uma impressão digital dela. Se perder, crie outra e revogue esta.</p>
+    <div class="chave-box" id="chave-valor"></div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-primary" id="chave-copiar">Copiar chave</button>
+      <button type="button" class="btn btn-outline" id="chave-fechar">Já copiei, fechar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/admin-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/integracoes.js"></script>
+</body>
+</html>
